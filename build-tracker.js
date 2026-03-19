@@ -2,8 +2,28 @@
    Build Tracker — Application Logic
    ============================================================ */
 
-let builds  = JSON.parse(localStorage.getItem('bt_builds')  || '[]');
-let clients = JSON.parse(localStorage.getItem('bt_clients') || '[]');
+let builds  = [];
+let clients = [];
+
+async function loadData() {
+  try {
+    const [buildsRes, clientsRes] = await Promise.all([
+      fetch('/api/builds'),
+      fetch('/api/clients'),
+    ]);
+
+    if (buildsRes.ok && clientsRes.ok) {
+      const buildsData  = await buildsRes.json();
+      const clientsData = await clientsRes.json();
+      builds  = buildsData.builds  || [];
+      clients = clientsData.clients || [];
+    } else if (buildsRes.status === 401 || clientsRes.status === 401) {
+      window.location.href = '/auth/login';
+    }
+  } catch (err) {
+    console.error('Failed to load data:', err);
+  }
+}
 
 let currentView     = 'all';
 let currentClientId = null;
@@ -17,9 +37,50 @@ let ctxId           = null;
 const PALETTE = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#639922','#BA7517','#E24B4A','#0F6E56','#888780'];
 
 /* ─── SAVE ─── */
+async function saveBuildToApi(build) {
+  const payload = {
+    id:             build.id,
+    title:          build.title,
+    type:           build.type,
+    status:         build.status,
+    clientId:       build.clientId       || '',
+    parentBuildId:  build.parentBuildId  || '',
+    description:    build.desc           || '',
+    startDate:      build.startDate      || '',
+    endDate:        build.endDate        || '',
+    demoDate:       build.demoDate       || '',
+    notes:          build.notes          || '',
+    milestones:     build.milestones     || [],
+    tweaks:         build.tweaks         || [],
+    createdAt:      build.createdAt      || Date.now(),
+  };
+
+  const res = await fetch(`/api/builds/${build.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+
+  // If 404 it doesn't exist yet — POST instead
+  if (res.status === 404) {
+    await fetch('/api/builds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  }
+}
+
+async function saveClientToApi(client) {
+  const payload = {
+    id:        client.id,
+    name:      client.name,
+    color:     client.color,
+    emoji:     client.emoji  || '',
+    notes:     client.notes  || '',
+    createdAt: client.createdAt || Date.now(),
+  };
+
+  const res = await fetch(`/api/clients/${client.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+
+  if (res.status === 404) {
+    await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  }
+}
+
 function save() {
-  localStorage.setItem('bt_builds',  JSON.stringify(builds));
-  localStorage.setItem('bt_clients', JSON.stringify(clients));
   updateStats();
   renderFolders();
 }
@@ -384,7 +445,6 @@ function pickColor(el) {
 function pickHexColor(val) {
   const hex = val.startsWith('#') ? val : '#' + val;
   const dot = document.getElementById('cm-hex-preview');
-  // Validate — update preview dot as user types, only set cmColor on valid 6-char hex
   if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
     cmColor = hex;
     if (dot) { dot.style.background = hex; dot.style.borderColor = hex; }
@@ -429,15 +489,17 @@ function updateCmPreview() {
   }
 }
 
-function saveClient() {
+async function saveClient() {
   const name=document.getElementById('cm-name').value.trim();
   if (!name) { document.getElementById('cm-name').focus(); return; }
   const notes=document.getElementById('cm-notes').value.trim();
   if (editClientId) {
     const idx=clients.findIndex(c=>c.id===editClientId);
     if (idx!==-1) clients[idx]={...clients[idx],name,color:cmColor,emoji:cmEmoji,notes};
+    await saveClientToApi(clients[idx]);
   } else {
     clients.push({id:uid(),name,color:cmColor,emoji:cmEmoji,notes,createdAt:Date.now()});
+    await saveClientToApi(clients[clients.length-1]);
   }
   save(); closeClientModal(); refreshSelects();
 }
@@ -459,7 +521,7 @@ function openCtx(e,cid) {
   m.classList.add('open');
 }
 function closeCtx() { document.getElementById('ctx-menu').classList.remove('open'); ctxId=null; }
-function ctxDo(action) {
+async function ctxDo(action) {
   closeCtx(); if(!ctxId) return;
   if (action==='edit'||action==='color') { openClientModal(ctxId); return; }
   if (action==='delete') {
@@ -467,8 +529,9 @@ function ctxDo(action) {
     const n=builds.filter(b=>b.clientId===ctxId).length;
     var msg = 'Delete "' + (c ? c.name : '') + '"?' + (n ? ' ' + n + ' build' + (n===1?'':'s') + ' will become unassigned.' : '');
     if (!window.confirm(msg)) return;
+    await fetch(`/api/clients/${ctxId}`, { method: 'DELETE' });
     clients=clients.filter(x=>x.id!==ctxId);
-    builds.forEach(b=>{ if(b.clientId===ctxId) b.clientId=''; });
+    builds.forEach(async b=>{ if(b.clientId===ctxId){ b.clientId=''; await saveBuildToApi(b); } });
     save(); refreshSelects();
     if (currentClientId===ctxId) showView('all');
     else { renderFolders(); renderBoard(); }
@@ -529,13 +592,15 @@ function editCurrentBuild() {
   document.getElementById('add-modal').classList.add('open');
 }
 function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); editBuildId=null; }
-function saveBuild() {
+async function saveBuild() {
   const title=document.getElementById('f-title').value.trim();
   if (!title) { document.getElementById('f-title').focus(); return; }
   const fType=document.getElementById('f-type').value;
   const data={title,type:fType,status:document.getElementById('f-status').value,clientId:document.getElementById('f-client-id').value,desc:document.getElementById('f-desc').value.trim(),startDate:document.getElementById('f-start').value,endDate:document.getElementById('f-end').value,demoDate:document.getElementById('f-demo').value,parentBuildId:fType==='tweak'?(document.getElementById('f-parent-id').value||''):'',};
   if (editBuildId) { const idx=builds.findIndex(b=>b.id===editBuildId); if(idx!==-1) builds[idx]={...builds[idx],...data}; }
   else builds.unshift({id:uid(),tweaks:[],milestones:defaultMilestones(data.demoDate),notes:'',createdAt:Date.now(),...data});
+  const buildIndex = editBuildId ? builds.findIndex(b=>b.id===editBuildId) : 0;
+  await saveBuildToApi(builds[buildIndex]);
   save(); closeAddModal();
   if (currentBuildId) openDetail(currentBuildId); else renderBoard();
 }
@@ -599,9 +664,10 @@ function switchTab(tab,el) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if(el) el.classList.add('active');
 }
-function deleteCurrentBuild() {
+async function deleteCurrentBuild() {
   var btn = document.getElementById('btn-delete');
   if (btn.dataset.confirming === '1') {
+    await fetch(`/api/builds/${currentBuildId}`, { method: 'DELETE' });
     builds = builds.filter(function(b){ return b.id !== currentBuildId; });
     save(); closeDetail();
   } else {
@@ -632,16 +698,16 @@ function renderTweaks(b) {
     <button class="btn btn-sm" style="padding:2px 8px;color:var(--text-faint);" onclick="removeTweak(${i})">×</button>
   </div>`).join('');
 }
-function toggleTweak(i){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.tweaks[i].done=!b.tweaks[i].done;save();renderTweaks(b);updateProgress(b);}
-function removeTweak(i){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.tweaks.splice(i,1);save();renderTweaks(b);updateProgress(b);}
-function addTweak(){
+async function toggleTweak(i){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.tweaks[i].done=!b.tweaks[i].done;save();await saveBuildToApi(b);renderTweaks(b);updateProgress(b);}
+async function removeTweak(i){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.tweaks.splice(i,1);save();await saveBuildToApi(b);renderTweaks(b);updateProgress(b);}
+async function addTweak(){
   const inp=document.getElementById('new-tweak-input'),text=inp.value.trim();if(!text)return;
   const b=builds.find(x=>x.id===currentBuildId);if(!b)return;
-  if(!b.tweaks)b.tweaks=[];b.tweaks.push({text,done:false});save();inp.value='';renderTweaks(b);updateProgress(b);
+  if(!b.tweaks)b.tweaks=[];b.tweaks.push({text,done:false});save();await saveBuildToApi(b);inp.value='';renderTweaks(b);updateProgress(b);
 }
-function saveNotes(){
+async function saveNotes(){
   const b=builds.find(x=>x.id===currentBuildId);if(!b)return;
-  b.notes=document.getElementById('notes-edit').value;save();
+  b.notes=document.getElementById('notes-edit').value;save();await saveBuildToApi(b);
   const btn=event.target;btn.textContent='Saved ✓';setTimeout(()=>btn.textContent='Save Notes',1500);
 }
 
@@ -690,22 +756,23 @@ function renderMilestones(b) {
     <div class="m-actions"><button class="btn btn-sm" style="padding:2px 8px;color:var(--text-faint);" onclick="removeMs(${i})">×</button></div>
   </div>`).join('');
 }
-function addStdMs(key){
+
+async function addStdMs(key){
   const b=builds.find(x=>x.id===currentBuildId);if(!b)return;
   if(!b.milestones)b.milestones=[];
   if(b.milestones.find(m=>m.key===key))return;
   const def=STD_MS.find(s=>s.key===key);if(!def)return;
-  b.milestones.push({id:uid(),key:def.key,label:def.label,standard:true,done:false,date:''});save();renderMilestones(b);
+  b.milestones.push({id:uid(),key:def.key,label:def.label,standard:true,done:false,date:''});save();await saveBuildToApi(b);renderMilestones(b);
 }
-function addMilestone(){
+async function addMilestone(){
   const inp=document.getElementById('new-m-input'),text=inp.value.trim();if(!text)return;
   const b=builds.find(x=>x.id===currentBuildId);if(!b)return;
   if(!b.milestones)b.milestones=[];
-  b.milestones.push({id:uid(),label:text,standard:false,done:false,date:''});save();inp.value='';renderMilestones(b);
+  b.milestones.push({id:uid(),label:text,standard:false,done:false,date:''});save();await saveBuildToApi(b);inp.value='';renderMilestones(b);
 }
-function toggleMs(i){const b=builds.find(x=>x.id===currentBuildId);if(!b||!b.milestones[i])return;b.milestones[i].done=!b.milestones[i].done;if(b.milestones[i].done&&!b.milestones[i].date)b.milestones[i].date=new Date().toISOString().slice(0,10);save();renderMilestones(b);}
-function setMsDate(i,v){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.milestones[i].date=v;save();renderMilestones(b);}
-function removeMs(i){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.milestones.splice(i,1);save();renderMilestones(b);}
+async function toggleMs(i){const b=builds.find(x=>x.id===currentBuildId);if(!b||!b.milestones[i])return;b.milestones[i].done=!b.milestones[i].done;if(b.milestones[i].done&&!b.milestones[i].date)b.milestones[i].date=new Date().toISOString().slice(0,10);save();await saveBuildToApi(b);renderMilestones(b);}
+async function setMsDate(i,v){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.milestones[i].date=v;save();await saveBuildToApi(b);renderMilestones(b);}
+async function removeMs(i){const b=builds.find(x=>x.id===currentBuildId);if(!b)return;b.milestones.splice(i,1);save();await saveBuildToApi(b);renderMilestones(b);}
 
 /* ─── IMPORT ─── */
 function openImportModal(){
@@ -746,16 +813,23 @@ async function extractItems(){
   document.getElementById('btn-import-save').style.display='';
 }
 
-function importSelected(){
+async function importSelected(){
   const cid=document.getElementById('import-client-id').value;
   const startDate=document.getElementById('import-start').value;
   const endDate=document.getElementById('import-end').value;
   const demoDate=document.getElementById('import-demo').value;
   let count=0;
+  const promises=[];
   extractedItems.forEach((item,i)=>{
     const chk=document.getElementById('ei-'+i);
-    if(chk&&chk.checked){builds.unshift({id:uid(),title:item.title,desc:item.desc||'',type:item.type||'build',status:'todo',clientId:cid,startDate,endDate,demoDate,tweaks:[],milestones:defaultMilestones(demoDate),notes:'',createdAt:Date.now()});count++;}
+    if(chk&&chk.checked){
+      const newBuild={id:uid(),title:item.title,desc:item.desc||'',type:item.type||'build',status:'todo',clientId:cid,startDate,endDate,demoDate,tweaks:[],milestones:defaultMilestones(demoDate),notes:'',createdAt:Date.now()};
+      builds.unshift(newBuild);
+      promises.push(saveBuildToApi(newBuild));
+      count++;
+    }
   });
+  await Promise.all(promises);
   save();closeImportModal();renderBoard();
   if(count>0){const m=document.createElement('div');m.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--text);color:var(--surface);padding:10px 18px;border-radius:8px;font-size:13px;z-index:999;';m.textContent=`${count} item${count===1?'':'s'} imported`;document.body.appendChild(m);setTimeout(()=>m.remove(),2800);}
 }
@@ -778,7 +852,7 @@ function toggleTheme() {
   }
 })();
 
-/* ─── EXPORT / IMPORT ─── */
+/* ─── EXPORT / IMPORT BACKUP ─── */
 function exportData() {
   const payload = {
     version: 1,
@@ -797,11 +871,11 @@ function exportData() {
   toast('Backup downloaded');
 }
 
-function importData(e) {
+async function importData(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function(ev) {
+  reader.onload = async function(ev) {
     try {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data.builds) || !Array.isArray(data.clients)) {
@@ -809,6 +883,9 @@ function importData(e) {
       }
       const bCount = data.builds.length;
       const cCount = data.clients.length;
+      // Save all to API
+      await Promise.all(data.clients.map(c => saveClientToApi(c)));
+      await Promise.all(data.builds.map(b => saveBuildToApi(b)));
       builds  = data.builds;
       clients = data.clients;
       save();
@@ -861,7 +938,7 @@ function loadDemoData() {
   _injectDemo();
 }
 
-function _injectDemo() {
+async function _injectDemo() {
   var now = Date.now();
   function uid2() { return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
   function dateStr(offsetDays) {
@@ -1100,6 +1177,10 @@ function _injectDemo() {
     },
   ];
 
+  // Save all demo data to API
+  await Promise.all(clients.map(c => saveClientToApi(c)));
+  await Promise.all(builds.map(b => saveBuildToApi(b)));
+
   save();
   refreshSelects();
   renderFolders();
@@ -1113,7 +1194,12 @@ function _injectDemo() {
 }
 
 /* ─── INIT ─── */
-refreshSelects();
-updateStats();
-renderFolders();
-renderBoard();
+async function init() {
+  await loadData();
+  refreshSelects();
+  updateStats();
+  renderFolders();
+  renderBoard();
+}
+
+init();
