@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Build Tracker</title>
+<link rel="stylesheet" href="build-tracker.css" />
+</head>
+<body>
+</head>
+<body>
+
+<aside>
+  <div class="logo">
+    <div class="logo-text">
+      <h1>Build Tracker</h1>
+      <p>Projects &amp; client tweaks</p>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark">🌙</button>
+  </div>
+  <nav>
+    <div class="nav-section">
+      <div class="nav-label">Views</div>
+      <button class="nav-item" onclick="showView('daily')" id="nav-daily">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v2H2z"/><path d="M2 7h8M2 11h6"/><circle cx="13" cy="11" r="2.5"/><path d="M13 9.5v1.5l1 1"/></svg>
+        Daily Todo <span class="nav-count" id="count-daily" style="background:#EB459E;color:white;display:none;"></span>
+      </button>
+      <button class="nav-item active" onclick="showView('all')" id="nav-all">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        All Builds <span class="nav-count" id="count-all">0</span>
+      </button>
+      <button class="nav-item" onclick="showView('tweaks')" id="nav-tweaks">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+        Tweaks Only <span class="nav-count" id="count-tweaks">0</span>
+      </button>
+      <button class="nav-item" onclick="showView('upcoming')" id="nav-upcoming">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>
+        Upcoming Demos <span class="nav-count" id="count-demos">0</span>
+      </button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Clients <button class="nav-label-btn" onclick="openClientModal()" title="New client">+</button></div>
+      <div id="folder-list"></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Actions</div>
+      <button class="nav-item" onclick="openAddModal()">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+        New Build
+      </button>
+      <button class="nav-item" onclick="openImportModal()">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M3 12h10"/></svg>
+        Import Transcript
+      </button>
+      <button class="nav-item" onclick="loadDemoData()" style="color:#EB459E;" id="btn-demo">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3l10 5-10 5V3z"/></svg>
+        Load Demo Data
+      </button>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="stats-row">
+      <div class="stat-pill"><span class="num" id="stat-total">0</span><span class="lbl">Total</span></div>
+      <div class="stat-pill"><span class="num" id="stat-active">0</span><span class="lbl">Active</span></div>
+      <div class="stat-pill"><span class="num" id="stat-demo">0</span><span class="lbl">Demos</span></div>
+    </div>
+    <div class="data-btns">
+      <button class="btn btn-sm data-btn" onclick="exportData()" title="Download all your data as a JSON backup file">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M3 13h10"/></svg>
+        Export backup
+      </button>
+      <label class="btn btn-sm data-btn" title="Restore from a previously exported backup file" style="cursor:pointer;">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12V4M5 7l3-3 3 3"/><path d="M3 13h10"/></svg>
+        Import backup
+        <input type="file" id="restore-input" accept=".json" style="display:none;" onchange="importData(event)" />
+      </label>
+    </div>
+  </div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="page-title" id="page-title">All Builds</span>
+      <input type="search" placeholder="Search..." id="search-input" oninput="renderBoard()" />
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" onclick="openImportModal()">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M3 12h10"/></svg>Import
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ New Build</button>
+    </div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="content" id="view-board">
+    <div class="filter-row" id="filter-row">
+      <span style="font-size:11px;color:var(--text-faint);">Filter:</span>
+      <button class="filter-chip fc-all active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-chip fc-todo" onclick="setFilter('todo',this)">To Do</button>
+      <button class="filter-chip fc-inprogress" onclick="setFilter('in-progress',this)">In Progress</button>
+      <button class="filter-chip fc-demo" onclick="setFilter('demo-ready',this)">Demo Ready</button>
+      <button class="filter-chip fc-done" onclick="setFilter('done',this)">Done</button>
+      <button class="filter-chip fc-tweak" onclick="setFilter('tweak',this)">Tweaks</button>
+    </div>
+    <div id="board-content"></div>
+  </div>
+
+  <!-- DAILY TODO -->
+  <div id="view-daily"></div>
+
+  <!-- DETAIL -->
+  <div id="view-detail" style="flex:1;overflow:hidden;display:none;flex-direction:column;">
+    <div class="detail-header">
+      <div class="detail-title-block">
+        <div style="margin-bottom:6px;"><button class="btn btn-sm" onclick="closeDetail()">← Back</button></div>
+        <h2 id="detail-title"></h2>
+        <div class="detail-meta-row">
+          <span class="badge" id="detail-badge"></span>
+          <span style="font-size:12px;color:var(--text-faint);" id="detail-client-lbl"></span>
+          <span id="detail-parent-link" style="font-size:12px;color:var(--accent-text);display:none;display:flex;align-items:center;gap:4px;"></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button class="btn btn-sm" onclick="editCurrentBuild()">Edit</button>
+        <button class="btn btn-sm" id="btn-delete" style="color:var(--danger-text);" onclick="deleteCurrentBuild()">Delete</button>
+      </div>
+    </div>
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="switchTab('overview',this)">Overview</button>
+      <button class="tab-btn" onclick="switchTab('tweaks',this)">Tweaks &amp; Tasks</button>
+      <button class="tab-btn" onclick="switchTab('notes',this)">Notes</button>
+    </div>
+    <div class="detail-body">
+      <div id="tab-overview">
+        <div class="detail-section"><h3>Timeline</h3><div class="detail-dates" id="detail-dates"></div></div>
+        <div class="detail-section" id="desc-section"><h3>Description</h3><div class="notes-area" id="detail-desc"></div></div>
+        <div class="detail-section">
+          <h3 style="margin-bottom:8px;">Milestones</h3>
+          <div class="milestone-track" id="m-track"></div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:var(--text-faint);">Add:</span>
+            <div class="tpl-chips" id="tpl-chips" style="margin-bottom:0;"></div>
+          </div>
+          <div class="add-row" style="margin-top:8px;">
+            <input type="text" id="new-m-input" placeholder="Custom milestone..." onkeydown="if(event.key==='Enter')addMilestone()" />
+            <button class="btn btn-sm" onclick="addMilestone()">Add</button>
+          </div>
+        </div>
+        <div class="detail-section"><h3>Progress</h3>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="progress-bar" style="flex:1;"><div class="progress-fill" id="prog-fill"></div></div>
+            <span style="font-size:12px;color:var(--text-muted);" id="prog-pct">0%</span>
+          </div>
+        </div>
+      </div>
+      <div id="tab-tweaks" style="display:none;">
+        <div class="detail-section"><h3>Tasks &amp; Tweaks</h3>
+          <div class="tweak-list" id="tweak-list"></div>
+          <div class="add-row">
+            <input type="text" id="new-tweak-input" placeholder="Add a task or tweak..." onkeydown="if(event.key==='Enter')addTweak()" />
+            <button class="btn btn-sm" onclick="addTweak()">Add</button>
+          </div>
+        </div>
+      </div>
+      <div id="tab-notes" style="display:none;">
+        <div class="detail-section"><h3>Notes</h3>
+          <textarea id="notes-edit" rows="10" style="width:100%;font-size:13px;line-height:1.7;" placeholder="Notes, session tidbits, meeting summaries..."></textarea>
+          <button class="btn btn-sm" style="margin-top:8px;" onclick="saveNotes()">Save Notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ADD/EDIT BUILD MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-header"><h2 id="modal-title">New Build</h2><button class="modal-close" onclick="closeAddModal()">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Title *</label><input type="text" id="f-title" placeholder="e.g. Client Portal Redesign" /></div>
+      <div class="field-row">
+        <div class="field"><label>Type</label><select id="f-type" onchange="onTypeChange()"><option value="build">Build</option><option value="tweak">Tweak / Small fix</option></select></div>
+        <div class="field"><label>Status</label><select id="f-status"><option value="todo">To Do</option><option value="in-progress">In Progress</option><option value="demo-ready">Demo Ready</option><option value="done">Done</option></select></div>
+      </div>
+      <div class="field"><label>Client folder</label><select id="f-client-id" onchange="onClientChange()"><option value="">— No client —</option></select></div>
+      <div class="field" id="f-parent-wrap" style="display:none;"><label>Linked build <span style="font-weight:400;color:var(--text-faint);">(optional)</span></label><select id="f-parent-id"><option value="">— Standalone tweak —</option></select></div>
+      <div class="field"><label>Description</label><textarea id="f-desc" rows="3" placeholder="What needs to be built or changed?"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Start Date</label><input type="date" id="f-start" /></div>
+        <div class="field"><label>End Date</label><input type="date" id="f-end" /></div>
+      </div>
+      <div class="field"><label>Demo Date</label><input type="date" id="f-demo" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBuild()">Save Build</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT MODAL -->
+<div class="modal-overlay" id="client-modal">
+  <div class="modal">
+    <div class="modal-header"><h2 id="cm-title">New Client Folder</h2><button class="modal-close" onclick="closeClientModal()">×</button></div>
+    <div class="modal-body">
+      <div class="cm-preview-row">
+        <div class="cm-preview-circle" id="cm-preview"></div>
+        <div class="field" style="flex:1;margin:0;"><label>Client name *</label><input type="text" id="cm-name" placeholder="e.g. Acme Corp" oninput="updateCmPreview()" /></div>
+      </div>
+      <div class="field">
+        <label>Colour</label>
+        <div class="color-palette" id="cm-colors"></div>
+        <div class="custom-hex-row">
+          <span style="font-size:11px;color:var(--text-faint);font-weight:600;">Custom:</span>
+          <input type="text" id="cm-hex-input" maxlength="7" placeholder="#5865F2" oninput="pickHexColor(this.value)" />
+          <div id="cm-hex-preview" class="hex-preview-dot"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Icon (optional)</label>
+        <div class="emoji-grid" id="cm-emojis"></div>
+        <div class="emoji-custom-row">
+          <input type="text" id="cm-custom-emoji" placeholder="Paste any emoji…" maxlength="4" oninput="pickCustomEmoji(this.value)" />
+          <button class="btn btn-sm" onclick="clearEmoji()">Clear icon</button>
+        </div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="cm-notes" rows="2" placeholder="Optional notes about this client..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeClientModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-header"><h2>Import Transcript</h2><button class="modal-close" onclick="closeImportModal()">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;">Paste or upload a meeting transcript. The AI will extract action items automatically.</p>
+      <div class="import-zone" id="import-zone" onclick="document.getElementById('file-input').click()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="this.classList.remove('drag-over')">
+        <strong>Drop a file here</strong>Click to upload .txt or .md
+        <input type="file" id="file-input" style="display:none;" accept=".txt,.md" onchange="handleFile(event)" />
+      </div>
+      <div class="field"><label>Or paste text</label><textarea id="import-text" rows="5" placeholder="Paste meeting notes or transcript..."></textarea></div>
+      <div id="import-preview-wrap" style="display:none;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">Preview</div>
+        <div class="import-preview" id="import-preview"></div>
+      </div>
+      <div id="ai-loading-wrap" style="display:none;"><div class="ai-loading"><span class="spinner"></span> Extracting action items...</div></div>
+      <div id="extracted-wrap" style="display:none;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px;">Select items to import</div>
+        <div class="action-items-list" id="extracted-list"></div>
+        <div class="field" style="margin-top:14px;"><label>Assign to client</label><select id="import-client-id"><option value="">— No client —</option></select></div>
+        <div class="field-row">
+          <div class="field"><label>Start Date</label><input type="date" id="import-start" /></div>
+          <div class="field"><label>End Date</label><input type="date" id="import-end" /></div>
+        </div>
+        <div class="field"><label>Demo Date</label><input type="date" id="import-demo" /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-extract" onclick="extractItems()">Extract Items</button>
+      <button class="btn btn-primary" id="btn-import-save" style="display:none;" onclick="importSelected()">Import Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctx-menu">
+  <button class="ctx-item" onclick="ctxDo('edit')">Edit / rename</button>
+  <button class="ctx-item" onclick="ctxDo('color')">Change colour</button>
+  <button class="ctx-item danger" onclick="ctxDo('delete')">Delete folder</button>
+</div>
+
+<script src="build-tracker.js"></script>
+</body>
+</html>
