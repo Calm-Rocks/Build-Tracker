@@ -4,6 +4,7 @@ const PUBLIC_PATHS = [
   '/auth/accept-invite',
   '/api/auth/login',
   '/api/auth/accept-invite',
+  '/api/invite',
 ];
 
 export async function onRequest(context) {
