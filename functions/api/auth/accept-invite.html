@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build Tracker — Accept Invite</title>
+  <style>
+    :root {
+      --bg: #313338;
+      --surface: #383A40;
+      --surface2: #2E3035;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.12);
+      --text: #F2F3F5;
+      --text-muted: #B5BAC1;
+      --text-faint: #80848E;
+      --accent: #5865F2;
+      --danger-text: #F28082;
+      --success-text: #57F287;
+      --radius: 6px;
+      --radius-lg: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'gg sans', 'Noto Sans', Whitney, 'Helvetica Neue', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); padding: 32px;
+      width: 100%; max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: var(--text-faint); margin-bottom: 24px; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    input {
+      background: var(--surface2); border: 1px solid var(--border-strong);
+      border-radius: var(--radius); color: var(--text);
+      font-size: 14px; padding: 9px 12px; outline: none;
+      transition: border-color 0.15s; width: 100%;
+      font-family: inherit;
+    }
+    input:focus { border-color: var(--accent); }
+    .btn {
+      width: 100%; padding: 10px; border-radius: var(--radius);
+      background: var(--accent); color: white; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      font-family: inherit; margin-top: 6px;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #4752C4; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error {
+      background: rgba(237,66,69,0.15); border: 1px solid rgba(237,66,69,0.3);
+      border-radius: var(--radius); padding: 10px 12px;
+      font-size: 13px; color: var(--danger-text);
+      margin-bottom: 14px; display: none;
+    }
+    .success {
+      background: rgba(87,242,135,0.12); border: 1px solid rgba(87,242,135,0.3);
+      border-radius: var(--radius); padding: 10px 12px;
+      font-size: 13px; color: var(--success-text);
+      margin-bottom: 14px; display: none;
+    }
+    .invalid {
+      text-align: center; padding: 16px 0;
+    }
+    .invalid p { font-size: 13px; color: var(--text-faint); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Build Tracker</h1>
+    <p class="subtitle" id="subtitle">Create your account</p>
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
+    <div id="form-wrap">
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Min. 8 characters" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <input type="password" id="confirm" placeholder="Repeat password" autocomplete="new-password" />
+      </div>
+      <button class="btn" id="btn" onclick="acceptInvite()">Create Account</button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get('token');
+
+    if (!token) {
+      document.getElementById('form-wrap').innerHTML =
+        '<div class="invalid"><p>This invite link is invalid or has expired.</p></div>';
+    } else {
+      document.getElementById('password').focus();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') acceptInvite();
+    });
+
+    async function acceptInvite() {
+      const password = document.getElementById('password').value;
+      const confirm  = document.getElementById('confirm').value;
+      const btn      = document.getElementById('btn');
+
+      hideMessages();
+
+      if (!password || !confirm) {
+        showError('Please fill in both fields.');
+        return;
+      }
+
+      if (password.length < 8) {
+        showError('Password must be at least 8 characters.');
+        return;
+      }
+
+      if (password !== confirm) {
+        showError('Passwords do not match.');
+        return;
+      }
+
+      btn.disabled    = true;
+      btn.textContent = 'Creating account...';
+
+      try {
+        const res = await fetch('/api/auth/accept-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showSuccess(`Account created for ${data.email}. Redirecting to login...`);
+          document.getElementById('form-wrap').style.display = 'none';
+          setTimeout(() => window.location.href = '/auth/login', 2000);
+        } else {
+          showError(data.error || 'Something went wrong.');
+          btn.disabled    = false;
+          btn.textContent = 'Create Account';
+        }
+      } catch (err) {
+        showError('Something went wrong. Please try again.');
+        btn.disabled    = false;
+        btn.textContent = 'Create Account';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent  = msg;
+      el.style.display = 'block';
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('success');
+      el.textContent  = msg;
+      el.style.display = 'block';
+    }
+
+    function hideMessages() {
+      document.getElementById('error').style.display   = 'none';
+      document.getElementById('success').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

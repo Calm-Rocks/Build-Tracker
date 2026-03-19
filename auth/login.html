@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build Tracker — Login</title>
+  <style>
+    :root {
+      --bg: #313338;
+      --surface: #383A40;
+      --surface2: #2E3035;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.12);
+      --text: #F2F3F5;
+      --text-muted: #B5BAC1;
+      --text-faint: #80848E;
+      --accent: #5865F2;
+      --danger-text: #F28082;
+      --radius: 6px;
+      --radius-lg: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'gg sans', 'Noto Sans', Whitney, 'Helvetica Neue', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); padding: 32px;
+      width: 100%; max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: var(--text-faint); margin-bottom: 24px; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    input {
+      background: var(--surface2); border: 1px solid var(--border-strong);
+      border-radius: var(--radius); color: var(--text);
+      font-size: 14px; padding: 9px 12px; outline: none;
+      transition: border-color 0.15s; width: 100%;
+      font-family: inherit;
+    }
+    input:focus { border-color: var(--accent); }
+    .btn {
+      width: 100%; padding: 10px; border-radius: var(--radius);
+      background: var(--accent); color: white; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      font-family: inherit; margin-top: 6px;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #4752C4; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error {
+      background: rgba(237,66,69,0.15); border: 1px solid rgba(237,66,69,0.3);
+      border-radius: var(--radius); padding: 10px 12px;
+      font-size: 13px; color: var(--danger-text);
+      margin-bottom: 14px; display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Build Tracker</h1>
+    <p class="subtitle">Sign in to your account</p>
+    <div class="error" id="error"></div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn" id="btn" onclick="login()">Sign in</button>
+  </div>
+
+  <script>
+    // Focus email on load
+    document.getElementById('email').focus();
+
+    // Allow Enter key to submit
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') login();
+    });
+
+    async function login() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn      = document.getElementById('btn');
+      const error    = document.getElementById('error');
+
+      error.style.display = 'none';
+
+      if (!email || !password) {
+        showError('Please enter your email and password.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          const params = new URLSearchParams(window.location.search);
+          window.location.href = params.get('next') || '/';
+        } else {
+          showError(data.error || 'Invalid email or password.');
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
+        }
+      } catch (err) {
+        showError('Something went wrong. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
