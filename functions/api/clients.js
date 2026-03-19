@@ -6,7 +6,16 @@ export async function onRequestGet(context) {
     'SELECT * FROM clients WHERE user_id = ? ORDER BY created_at ASC'
   ).bind(userId).all();
 
-  return json({ clients: results });
+  const clients = results.map(c => ({
+    id:        c.id,
+    name:      c.name,
+    color:     c.color,
+    emoji:     c.emoji,
+    notes:     c.notes,
+    createdAt: c.created_at,
+  }));
+
+  return json({ clients });
 }
 
 export async function onRequestPost(context) {
