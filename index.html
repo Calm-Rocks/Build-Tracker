@@ -64,20 +64,21 @@
       <div class="stat-pill"><span class="num" id="stat-active">0</span><span class="lbl">Active</span></div>
       <div class="stat-pill"><span class="num" id="stat-demo">0</span><span class="lbl">Demos</span></div>
     </div>
-    <button class="btn btn-sm data-btn" onclick="logout()" style="width:100%;margin-bottom:6px;justify-content:center;">
-  Sign out
-</button>
     <div class="data-btns">
-      <button class="btn btn-sm data-btn" onclick="exportData()" title="Download all your data as a JSON backup file">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M3 13h10"/></svg>
-        Export backup
-      </button>
-      <label class="btn btn-sm data-btn" title="Restore from a previously exported backup file" style="cursor:pointer;">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12V4M5 7l3-3 3 3"/><path d="M3 13h10"/></svg>
-        Import backup
-        <input type="file" id="restore-input" accept=".json" style="display:none;" onchange="importData(event)" />
-      </label>
-    </div>
+  <button class="btn btn-sm data-btn" onclick="exportData()" title="Download all your data as a JSON backup file">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M3 13h10"/></svg>
+    Export backup
+  </button>
+  <label class="btn btn-sm data-btn" title="Restore from a previously exported backup file" style="cursor:pointer;">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12V4M5 7l3-3 3 3"/><path d="M3 13h10"/></svg>
+    Import backup
+    <input type="file" id="restore-input" accept=".json" style="display:none;" onchange="importData(event)" />
+  </label>
+  <button class="btn btn-sm data-btn" onclick="logout()" title="Sign out">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"/></svg>
+    Sign out
+  </button>
+  </div>
   </div>
 </aside>
 
