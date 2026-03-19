@@ -6,11 +6,21 @@ export async function onRequestGet(context) {
     'SELECT * FROM builds WHERE user_id = ? ORDER BY created_at DESC'
   ).bind(userId).all();
 
-  // Parse JSON blobs back to arrays
   const builds = results.map(b => ({
-    ...b,
-    milestones: JSON.parse(b.milestones || '[]'),
-    tweaks:     JSON.parse(b.tweaks     || '[]'),
+    id:            b.id,
+    clientId:      b.client_id,
+    parentBuildId: b.parent_build_id,
+    title:         b.title,
+    type:          b.type,
+    status:        b.status,
+    desc:          b.description,
+    startDate:     b.start_date,
+    endDate:       b.end_date,
+    demoDate:      b.demo_date,
+    notes:         b.notes,
+    milestones:    JSON.parse(b.milestones || '[]'),
+    tweaks:        JSON.parse(b.tweaks     || '[]'),
+    createdAt:     b.created_at,
   }));
 
   return json({ builds });

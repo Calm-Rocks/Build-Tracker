@@ -36,6 +36,11 @@ let ctxId           = null;
 
 const PALETTE = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#639922','#BA7517','#E24B4A','#0F6E56','#888780'];
 
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/auth/login';
+}
+
 /* ─── SAVE ─── */
 async function saveBuildToApi(build) {
   const payload = {

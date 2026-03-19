@@ -3,16 +3,27 @@ export async function onRequestGet(context) {
   const userId  = data.user.id;
   const buildId = params.id;
 
-  const build = await env.DB.prepare(
+  const b = await env.DB.prepare(
     'SELECT * FROM builds WHERE id = ? AND user_id = ?'
   ).bind(buildId, userId).first();
 
-  if (!build) return json({ error: 'Not found.' }, 404);
+  if (!b) return json({ error: 'Not found.' }, 404);
 
   return json({
-    ...build,
-    milestones: JSON.parse(build.milestones || '[]'),
-    tweaks:     JSON.parse(build.tweaks     || '[]'),
+    id:            b.id,
+    clientId:      b.client_id,
+    parentBuildId: b.parent_build_id,
+    title:         b.title,
+    type:          b.type,
+    status:        b.status,
+    desc:          b.description,
+    startDate:     b.start_date,
+    endDate:       b.end_date,
+    demoDate:      b.demo_date,
+    notes:         b.notes,
+    milestones:    JSON.parse(b.milestones || '[]'),
+    tweaks:        JSON.parse(b.tweaks     || '[]'),
+    createdAt:     b.created_at,
   });
 }
 
