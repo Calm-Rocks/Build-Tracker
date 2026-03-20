@@ -14,6 +14,7 @@ export async function onRequestGet(context) {
   const redirectUri = `${url.origin}/api/auth/google/callback`;
 
   // Exchange code for tokens
+  // Exchange code for tokens
   let tokens;
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -28,8 +29,11 @@ export async function onRequestGet(context) {
       }),
     });
     tokens = await res.json();
-  } catch {
-    return Response.redirect(`${url.origin}/auth/login?error=google_failed`, 302);
+    if (!tokens.access_token) {
+      return new Response(JSON.stringify(tokens), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+  } catch (e) {
+    return new Response(e.message, { status: 500 });
   }
 
   if (!tokens.access_token) {
