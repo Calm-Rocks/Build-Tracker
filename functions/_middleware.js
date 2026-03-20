@@ -15,7 +15,8 @@ export async function onRequest(context) {
   const path = url.pathname;
 
   // Allow public paths through
-  if (PUBLIC_PATHS.some(p => path.startsWith(p))) {
+  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  if (PUBLIC_PATHS.some(p => normalizedPath.startsWith(p))) {
     return next();
   }
 
