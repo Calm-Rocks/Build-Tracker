@@ -8,8 +8,8 @@ let clients = [];
 async function loadData() {
   try {
     const [buildsRes, clientsRes] = await Promise.all([
-      fetch('/api/builds'),
-      fetch('/api/clients'),
+      apiFetch('/api/builds'),
+      apiFetch('/api/clients'),
     ]);
 
     if (buildsRes.ok && clientsRes.ok) {
@@ -25,6 +25,21 @@ async function loadData() {
   }
 }
 
+/* ─── CSRF ─── */
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)bt_csrf=([^;]*)/);
+  return match ? match[1] : '';
+}
+
+async function apiFetch(url, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = { ...(options.headers || {}) };
+  if (method !== 'GET') {
+    headers['X-CSRF-Token'] = getCsrfToken();
+  }
+  return fetch(url, { ...options, headers });
+}
+
 let currentView     = 'all';
 let currentClientId = null;
 let currentFilter   = 'all';
@@ -37,7 +52,7 @@ let ctxId           = null;
 const PALETTE = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#639922','#BA7517','#E24B4A','#0F6E56','#888780'];
 
 async function logout() {
-  await fetch('/api/auth/logout', { method: 'POST' });
+  await apiFetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/auth/login';
 }
 
@@ -60,11 +75,11 @@ async function saveBuildToApi(build) {
     createdAt:      build.createdAt      || Date.now(),
   };
 
-  const res = await fetch(`/api/builds/${build.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const res = await apiFetch(`/api/builds/${build.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
   // If 404 it doesn't exist yet — POST instead
   if (res.status === 404) {
-    await fetch('/api/builds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    await apiFetch('/api/builds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
 }
 
@@ -78,10 +93,10 @@ async function saveClientToApi(client) {
     createdAt: client.createdAt || Date.now(),
   };
 
-  const res = await fetch(`/api/clients/${client.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const res = await apiFetch(`/api/clients/${client.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
   if (res.status === 404) {
-    await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    await apiFetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
 }
 
@@ -534,7 +549,7 @@ async function ctxDo(action) {
     const n=builds.filter(b=>b.clientId===ctxId).length;
     var msg = 'Delete "' + (c ? c.name : '') + '"?' + (n ? ' ' + n + ' build' + (n===1?'':'s') + ' will become unassigned.' : '');
     if (!window.confirm(msg)) return;
-    await fetch(`/api/clients/${ctxId}`, { method: 'DELETE' });
+    await apiFetch(`/api/clients/${ctxId}`, { method: 'DELETE' });
     clients=clients.filter(x=>x.id!==ctxId);
     builds.forEach(async b=>{ if(b.clientId===ctxId){ b.clientId=''; await saveBuildToApi(b); } });
     save(); refreshSelects();
@@ -672,7 +687,7 @@ function switchTab(tab,el) {
 async function deleteCurrentBuild() {
   var btn = document.getElementById('btn-delete');
   if (btn.dataset.confirming === '1') {
-    await fetch(`/api/builds/${currentBuildId}`, { method: 'DELETE' });
+    await apiFetch(`/api/builds/${currentBuildId}`, { method: 'DELETE' });
     builds = builds.filter(function(b){ return b.id !== currentBuildId; });
     save(); closeDetail();
   } else {
