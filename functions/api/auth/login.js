@@ -4,6 +4,8 @@ const COOKIE_NAME = 'bt_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_ATTEMPTS = 10;
+const LOCKOUT_DURATION = 60 * 60 * 1000; // 1 hour
 
 async function checkRateLimit(env, key) {
   const now = Date.now();
@@ -18,7 +20,6 @@ async function checkRateLimit(env, key) {
     return { limited: false, attempts: 1 };
   }
 
-  // Reset window if expired
   if (now - record.window_start > WINDOW_MS) {
     await env.DB.prepare(
       'UPDATE rate_limits SET attempts = 1, window_start = ? WHERE key = ?'
@@ -26,7 +27,6 @@ async function checkRateLimit(env, key) {
     return { limited: false, attempts: 1 };
   }
 
-  // Increment attempts
   const attempts = record.attempts + 1;
   await env.DB.prepare(
     'UPDATE rate_limits SET attempts = ? WHERE key = ?'
@@ -65,7 +65,6 @@ export async function onRequestPost(context) {
     return json({ error: 'Email and password are required.' }, 400);
   }
 
-  // Enforce input length limits
   if (email.length > 254 || password.length > 1024) {
     return json({ error: 'Invalid input.' }, 400);
   }
@@ -83,7 +82,7 @@ export async function onRequestPost(context) {
 
   // Look up user
   const user = await env.DB.prepare(
-    'SELECT id, email, password_hash FROM users WHERE email = ?'
+    'SELECT id, email, password_hash, locked_until FROM users WHERE email = ?'
   ).bind(normalizedEmail).first();
 
   if (!user) {
@@ -91,7 +90,14 @@ export async function onRequestPost(context) {
     return json({ error: 'Invalid email or password.' }, 401);
   }
 
-  // Reject Google-only accounts attempting password login
+  // Check account lockout
+  if (user.locked_until && user.locked_until > Date.now()) {
+    const minutesLeft = Math.ceil((user.locked_until - Date.now()) / 60000);
+    await audit(env, 'login_account_locked', { email: normalizedEmail, ip, user_id: user.id });
+    return json({ error: `Account temporarily locked. Try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.` }, 423);
+  }
+
+  // Reject Google-only accounts
   if (!user.password_hash) {
     await audit(env, 'login_failed_google_only', { email: normalizedEmail, ip });
     return json({ error: 'This account uses Google sign in.' }, 401);
@@ -99,15 +105,32 @@ export async function onRequestPost(context) {
 
   // Check password
   const valid = await compare(password, user.password_hash);
+
   if (!valid) {
+    // Track failed attempts against the account
+    const accountKey = `login_account:${normalizedEmail}`;
+    const { attempts } = await checkRateLimit(env, accountKey);
+
+    // Lock account after too many failures
+    if (attempts >= LOCKOUT_ATTEMPTS) {
+      const lockedUntil = Date.now() + LOCKOUT_DURATION;
+      await env.DB.prepare(
+        'UPDATE users SET locked_until = ? WHERE id = ?'
+      ).bind(lockedUntil, user.id).run();
+      await audit(env, 'login_account_locked_triggered', { email: normalizedEmail, ip, user_id: user.id });
+      return json({ error: 'Too many failed attempts. Account locked for 1 hour.' }, 423);
+    }
+
     await audit(env, 'login_failed_wrong_password', { email: normalizedEmail, ip, user_id: user.id });
     return json({ error: 'Invalid email or password.' }, 401);
   }
 
-  // Clear rate limit on successful login
-  await env.DB.prepare(
-    'DELETE FROM rate_limits WHERE key = ?'
-  ).bind(rateLimitKey).run();
+  // Clear rate limits and lockout on successful login
+  await Promise.all([
+    env.DB.prepare('DELETE FROM rate_limits WHERE key = ?').bind(rateLimitKey).run(),
+    env.DB.prepare('DELETE FROM rate_limits WHERE key = ?').bind(`login_account:${normalizedEmail}`).run(),
+    env.DB.prepare('UPDATE users SET locked_until = NULL WHERE id = ?').bind(user.id).run(),
+  ]);
 
   // Create session
   const sessionId = crypto.randomUUID();
