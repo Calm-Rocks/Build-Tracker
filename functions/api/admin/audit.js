@@ -19,11 +19,3 @@ function json(data, status = 200) {
     headers: { 'Content-Type': 'application/json' },
   });
 }
-```
-
-So the new file structure in `functions/api/admin/` is:
-```
-functions/api/admin/
-├── audit.js
-├── cleanup.js
-└── stats.js
