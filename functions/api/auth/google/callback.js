@@ -98,7 +98,7 @@ export async function onRequestGet(context) {
     `${COOKIE_NAME}=${sessionId}`,
     'HttpOnly',
     'Secure',
-    'SameSite=Strict',
+    'SameSite=Lax',
     `Max-Age=${SESSION_DURATION / 1000}`,
     'Path=/',
   ].join('; ');
