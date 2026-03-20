@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tools</title>
+  <style>
+    :root {
+      --bg: #313338;
+      --surface: #383A40;
+      --surface2: #2E3035;
+      --surface3: #404249;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.12);
+      --text: #F2F3F5;
+      --text-muted: #B5BAC1;
+      --text-faint: #80848E;
+      --accent: #5865F2;
+      --accent-bg: rgba(88,101,242,0.15);
+      --success: #57F287;
+      --success-bg: rgba(87,242,135,0.12);
+      --success-text: #57F287;
+      --danger: #ED4245;
+      --danger-bg: rgba(237,66,69,0.15);
+      --danger-text: #F28082;
+      --radius: 6px;
+      --radius-lg: 8px;
+      --font-ui: 'gg sans', 'Noto Sans', Whitney, 'Helvetica Neue', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+    .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+      margin-bottom: 16px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    input {
+      background: var(--surface2);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+      font-family: var(--font-ui);
+    }
+    input:focus { border-color: var(--accent); }
+    input[type="password"] { font-family: monospace; letter-spacing: 0.1em; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: var(--accent);
+      color: white;
+      transition: background 0.15s;
+      width: 100%;
+      margin-top: 4px;
+    }
+    .btn:hover { background: #4752C4; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result {
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+      line-height: 1.6;
+    }
+    .result.success { background: var(--success-bg); border: 1px solid rgba(87,242,135,0.2); color: var(--success-text); }
+    .result.error { background: var(--danger-bg); border: 1px solid rgba(237,66,69,0.2); color: var(--danger-text); }
+    .invite-url {
+      background: var(--surface2);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: monospace;
+      color: var(--text-muted);
+      word-break: break-all;
+      margin-top: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      position: relative;
+    }
+    .invite-url:hover { border-color: var(--accent); }
+    .copy-hint {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 6px;
+      font-family: var(--font-ui);
+    }
+    .copied-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--accent);
+      color: white;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .copied-toast.show { opacity: 1; }
+    .lock-icon {
+      font-size: 32px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .page-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .page-subtitle {
+      font-size: 13px;
+      color: var(--text-faint);
+      margin-bottom: 20px;
+    }
+    .auth-gate { display: block; }
+    .tools-gate { display: none; }
+    .reused-badge {
+      display: inline-block;
+      background: rgba(254,231,92,0.15);
+      color: #FEE75C;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Auth gate -->
+    <div class="card auth-gate" id="auth-gate">
+      <div class="lock-icon">🔑</div>
+      <div class="page-title">Admin tools</div>
+      <div class="page-subtitle">Enter your admin key to continue.</div>
+      <div class="field">
+        <label>Admin key</label>
+        <input type="password" id="admin-key-input" placeholder="••••••••••••••••" autocomplete="off" />
+      </div>
+      <button class="btn" onclick="unlock()">Unlock</button>
+      <div class="result error" id="auth-error">Incorrect admin key.</div>
+    </div>
+
+    <!-- Tools (shown after auth) -->
+    <div class="tools-gate" id="tools-gate">
+
+      <!-- Invite generator -->
+      <div class="card">
+        <div class="card-title">Generate invite</div>
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" id="invite-email" placeholder="colleague@example.com" autocomplete="off" />
+        </div>
+        <button class="btn" id="invite-btn" onclick="generateInvite()">Generate invite link</button>
+        <div class="result" id="invite-result"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="copied-toast" id="copied-toast">Copied to clipboard</div>
+
+  <script>
+    let adminKey = '';
+
+    document.getElementById('admin-key-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') unlock();
+    });
+
+    document.getElementById('invite-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') generateInvite();
+    });
+
+    async function unlock() {
+      const key = document.getElementById('admin-key-input').value.trim();
+      if (!key) return;
+
+      // Test the key by making a dummy request
+      const res = await fetch('/api/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Key': key,
+        },
+        body: JSON.stringify({ email: '' }),
+      });
+
+      if (res.status === 401) {
+        document.getElementById('auth-error').style.display = 'block';
+        return;
+      }
+
+      // Key is valid (any other response means we got through auth)
+      adminKey = key;
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('tools-gate').style.display = 'block';
+      setTimeout(() => document.getElementById('invite-email').focus(), 50);
+    }
+
+    async function generateInvite() {
+      const email = document.getElementById('invite-email').value.trim();
+      const btn   = document.getElementById('invite-btn');
+      const result = document.getElementById('invite-result');
+
+      result.style.display = 'none';
+      result.className = 'result';
+
+      if (!email) {
+        showResult('error', 'Please enter an email address.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+
+      try {
+        const res = await fetch('/api/invite', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key': adminKey,
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          const reused = data.reused ? '<span class="reused-badge">Existing</span>' : '';
+          result.className = 'result success';
+          result.innerHTML = `Invite ready for <strong>${data.email}</strong>${reused}<div class="invite-url" onclick="copyUrl(this)" title="Click to copy">${data.invite_url}</div><div class="copy-hint">Click the link above to copy</div>`;
+          result.style.display = 'block';
+          document.getElementById('invite-email').value = '';
+        } else {
+          showResult('error', data.error || 'Something went wrong.');
+        }
+      } catch (err) {
+        showResult('error', 'Request failed. Check your connection.');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Generate invite link';
+    }
+
+    function showResult(type, msg) {
+      const result = document.getElementById('invite-result');
+      result.className = `result ${type}`;
+      result.textContent = msg;
+      result.style.display = 'block';
+    }
+
+    function copyUrl(el) {
+      const url = el.textContent.trim();
+      navigator.clipboard.writeText(url).then(() => {
+        const toast = document.getElementById('copied-toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2000);
+      });
+    }
+  </script>
+</body>
+</html>
