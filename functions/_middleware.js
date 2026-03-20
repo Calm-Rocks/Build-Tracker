@@ -4,6 +4,8 @@ const PUBLIC_PATHS = [
   '/auth/accept-invite',
   '/api/auth/login',
   '/api/auth/accept-invite',
+  '/api/auth/google',
+  '/api/auth/google/callback',
   '/api/invite',
 ];
 
