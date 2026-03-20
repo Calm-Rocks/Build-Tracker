@@ -28,11 +28,12 @@ export async function onRequestGet(context) {
       }),
     });
     tokens = await res.json();
-    if (!tokens.access_token) {
-      return new Response(JSON.stringify(tokens), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
-  } catch (e) {
-    return new Response(e.message, { status: 500 });
+  } catch {
+    return Response.redirect(`${url.origin}/auth/login?error=google_failed`, 302);
+  }
+
+  if (!tokens.access_token) {
+    return Response.redirect(`${url.origin}/auth/login?error=google_failed`, 302);
   }
 
   // Get user info from Google
