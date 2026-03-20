@@ -237,7 +237,16 @@
         <button class="btn" id="invite-btn" onclick="generateInvite()">Generate invite link</button>
         <div class="result" id="invite-result"></div>
       </div>
-
+      <!-- Unlock account -->
+      <div class="card">
+        <div class="card-title">Unlock account</div>
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" id="unlock-email" placeholder="locked@example.com" autocomplete="off" />
+        </div>
+        <button class="btn btn-neutral" id="unlock-btn" onclick="unlockAccount()" style="margin-top:4px;">Unlock account</button>
+        <div class="result" id="unlock-result"></div>
+      </div>
       <!-- Audit log -->
       <div class="card">
         <div class="card-title">Recent audit log</div>
@@ -260,6 +269,9 @@
     });
     document.getElementById('invite-email').addEventListener('keydown', e => {
       if (e.key === 'Enter') generateInvite();
+    });
+    document.getElementById('unlock-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') unlockAccount();
     });
 
     async function unlock() {
@@ -431,6 +443,53 @@
         setTimeout(() => toast.classList.remove('show'), 2000);
       });
     }
+
+    async function unlockAccount() {
+  const email  = document.getElementById('unlock-email').value.trim();
+  const btn    = document.getElementById('unlock-btn');
+  const result = document.getElementById('unlock-result');
+
+  result.style.display = 'none';
+  result.className = 'result';
+
+  if (!email) { 
+    result.className = 'result error';
+    result.textContent = 'Please enter an email address.';
+    result.style.display = 'block';
+    return; 
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Unlocking...';
+
+  try {
+    const res = await fetch('/api/admin/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      result.className = 'result success';
+      result.textContent = `Account unlocked for ${data.email}.`;
+      result.style.display = 'block';
+      document.getElementById('unlock-email').value = '';
+      await loadAuditLog();
+    } else {
+      result.className = 'result error';
+      result.textContent = data.error || 'Something went wrong.';
+      result.style.display = 'block';
+    }
+  } catch {
+    result.className = 'result error';
+    result.textContent = 'Request failed.';
+    result.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Unlock account';
+}
   </script>
 </body>
 </html>
