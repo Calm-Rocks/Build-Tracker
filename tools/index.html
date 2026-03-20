@@ -23,6 +23,8 @@
       --danger: #ED4245;
       --danger-bg: rgba(237,66,69,0.15);
       --danger-text: #F28082;
+      --warn-bg: rgba(254,231,92,0.12);
+      --warn-text: #FEE75C;
       --radius: 6px;
       --radius-lg: 8px;
       --font-ui: 'gg sans', 'Noto Sans', Whitney, 'Helvetica Neue', sans-serif;
@@ -38,7 +40,7 @@
       justify-content: center;
       padding: 40px 24px;
     }
-    .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+    .container { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 16px; }
     .card {
       background: var(--surface);
       border: 1px solid var(--border-strong);
@@ -90,6 +92,10 @@
     }
     .btn:hover { background: #4752C4; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #A32D2D; }
+    .btn-neutral { background: var(--surface3); color: var(--text-muted); }
+    .btn-neutral:hover { background: var(--border-strong); color: var(--text); }
     .result {
       border-radius: var(--radius);
       padding: 12px 14px;
@@ -100,6 +106,7 @@
     }
     .result.success { background: var(--success-bg); border: 1px solid rgba(87,242,135,0.2); color: var(--success-text); }
     .result.error { background: var(--danger-bg); border: 1px solid rgba(237,66,69,0.2); color: var(--danger-text); }
+    .result.warn { background: var(--warn-bg); border: 1px solid rgba(254,231,92,0.2); color: var(--warn-text); }
     .invite-url {
       background: var(--surface2);
       border: 1px solid var(--border-strong);
@@ -112,15 +119,9 @@
       margin-top: 8px;
       cursor: pointer;
       transition: border-color 0.15s;
-      position: relative;
     }
     .invite-url:hover { border-color: var(--accent); }
-    .copy-hint {
-      font-size: 11px;
-      color: var(--text-faint);
-      margin-top: 6px;
-      font-family: var(--font-ui);
-    }
+    .copy-hint { font-size: 11px; color: var(--text-faint); margin-top: 6px; font-family: var(--font-ui); }
     .copied-toast {
       position: fixed;
       bottom: 24px;
@@ -137,21 +138,9 @@
       pointer-events: none;
     }
     .copied-toast.show { opacity: 1; }
-    .lock-icon {
-      font-size: 32px;
-      text-align: center;
-      margin-bottom: 12px;
-    }
-    .page-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .page-subtitle {
-      font-size: 13px;
-      color: var(--text-faint);
-      margin-bottom: 20px;
-    }
+    .lock-icon { font-size: 32px; text-align: center; margin-bottom: 12px; }
+    .page-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .page-subtitle { font-size: 13px; color: var(--text-faint); margin-bottom: 20px; }
     .auth-gate { display: block; }
     .tools-gate { display: none; }
     .reused-badge {
@@ -167,6 +156,41 @@
       margin-left: 6px;
       vertical-align: middle;
     }
+
+    /* Audit log */
+    .audit-log { display: flex; flex-direction: column; gap: 6px; max-height: 400px; overflow-y: auto; }
+    .audit-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .audit-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0; margin-top: 3px;
+    }
+    .audit-dot.success { background: var(--success); }
+    .audit-dot.warn { background: #FEE75C; }
+    .audit-dot.danger { background: var(--danger); }
+    .audit-dot.neutral { background: var(--text-faint); }
+    .audit-event { font-weight: 600; color: var(--text-muted); flex: 1; }
+    .audit-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+    .audit-time { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
+    .audit-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 20px; }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { margin-top: 0; }
+    .stat-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    .stat-pill {
+      flex: 1; background: var(--surface2);
+      border-radius: var(--radius); padding: 10px 8px;
+      text-align: center; border: 1px solid var(--border);
+    }
+    .stat-pill .num { font-size: 20px; font-weight: 700; display: block; }
+    .stat-pill .lbl { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -185,8 +209,23 @@
       <div class="result error" id="auth-error">Incorrect admin key.</div>
     </div>
 
-    <!-- Tools (shown after auth) -->
+    <!-- Tools -->
     <div class="tools-gate" id="tools-gate">
+
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">Overview</div>
+        <div class="stat-row" id="stat-row">
+          <div class="stat-pill"><span class="num" id="stat-users">—</span><span class="lbl">Users</span></div>
+          <div class="stat-pill"><span class="num" id="stat-sessions">—</span><span class="lbl">Sessions</span></div>
+          <div class="stat-pill"><span class="num" id="stat-invites">—</span><span class="lbl">Pending invites</span></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-neutral" onclick="loadStats()">Refresh</button>
+          <button class="btn btn-danger" id="cleanup-btn" onclick="runCleanup()">Run cleanup</button>
+        </div>
+        <div class="result" id="cleanup-result"></div>
+      </div>
 
       <!-- Invite generator -->
       <div class="card">
@@ -199,8 +238,16 @@
         <div class="result" id="invite-result"></div>
       </div>
 
-    </div>
+      <!-- Audit log -->
+      <div class="card">
+        <div class="card-title">Recent audit log</div>
+        <div class="audit-log" id="audit-log">
+          <div class="audit-empty">Loading...</div>
+        </div>
+        <button class="btn btn-neutral" style="margin-top:12px;" onclick="loadAuditLog()">Refresh</button>
+      </div>
 
+    </div>
   </div>
 
   <div class="copied-toast" id="copied-toast">Copied to clipboard</div>
@@ -211,7 +258,6 @@
     document.getElementById('admin-key-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') unlock();
     });
-
     document.getElementById('invite-email').addEventListener('keydown', e => {
       if (e.key === 'Enter') generateInvite();
     });
@@ -220,13 +266,9 @@
       const key = document.getElementById('admin-key-input').value.trim();
       if (!key) return;
 
-      // Test the key by making a dummy request
       const res = await fetch('/api/invite', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Key': key,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key },
         body: JSON.stringify({ email: '' }),
       });
 
@@ -235,25 +277,116 @@
         return;
       }
 
-      // Key is valid (any other response means we got through auth)
       adminKey = key;
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('tools-gate').style.display = 'block';
+      await Promise.all([loadStats(), loadAuditLog()]);
       setTimeout(() => document.getElementById('invite-email').focus(), 50);
     }
 
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/admin/stats', {
+          headers: { 'X-Admin-Key': adminKey },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('stat-users').textContent    = data.users ?? '—';
+        document.getElementById('stat-sessions').textContent = data.sessions ?? '—';
+        document.getElementById('stat-invites').textContent  = data.pending_invites ?? '—';
+      } catch {}
+    }
+
+    async function loadAuditLog() {
+      const container = document.getElementById('audit-log');
+      container.innerHTML = '<div class="audit-empty">Loading...</div>';
+      try {
+        const res = await fetch('/api/admin/audit', {
+          headers: { 'X-Admin-Key': adminKey },
+        });
+        if (!res.ok) { container.innerHTML = '<div class="audit-empty">Failed to load.</div>'; return; }
+        const data = await res.json();
+        if (!data.entries || !data.entries.length) {
+          container.innerHTML = '<div class="audit-empty">No entries yet.</div>';
+          return;
+        }
+        container.innerHTML = data.entries.map(e => {
+          const dot = dotClass(e.event);
+          const time = new Date(e.created_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+          const meta = [e.email, e.ip !== 'unknown' ? e.ip : null].filter(Boolean).join(' · ');
+          return `<div class="audit-row">
+            <div class="audit-dot ${dot}"></div>
+            <div style="flex:1">
+              <div class="audit-event">${formatEvent(e.event)}</div>
+              ${meta ? `<div class="audit-meta">${meta}</div>` : ''}
+            </div>
+            <div class="audit-time">${time}</div>
+          </div>`;
+        }).join('');
+      } catch {
+        container.innerHTML = '<div class="audit-empty">Failed to load.</div>';
+      }
+    }
+
+    function dotClass(event) {
+      if (event.includes('success')) return 'success';
+      if (event.includes('created')) return 'success';
+      if (event.includes('linked')) return 'success';
+      if (event.includes('reused')) return 'warn';
+      if (event.includes('rate_limited')) return 'danger';
+      if (event.includes('failed')) return 'danger';
+      if (event.includes('unauthorised')) return 'danger';
+      if (event.includes('invalid')) return 'danger';
+      if (event.includes('expired')) return 'warn';
+      return 'neutral';
+    }
+
+    function formatEvent(event) {
+      return event.replace(/_/g, ' ');
+    }
+
+    async function runCleanup() {
+      const btn = document.getElementById('cleanup-btn');
+      const result = document.getElementById('cleanup-result');
+      result.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+
+      try {
+        const res = await fetch('/api/admin/cleanup', {
+          method: 'POST',
+          headers: { 'X-Admin-Key': adminKey },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result.className = 'result success';
+          result.textContent = `Cleaned ${data.cleaned.sessions} expired sessions and ${data.cleaned.invites} old invites.`;
+          result.style.display = 'block';
+          await loadStats();
+        } else {
+          result.className = 'result error';
+          result.textContent = data.error || 'Cleanup failed.';
+          result.style.display = 'block';
+        }
+      } catch {
+        result.className = 'result error';
+        result.textContent = 'Request failed.';
+        result.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Run cleanup';
+    }
+
     async function generateInvite() {
-      const email = document.getElementById('invite-email').value.trim();
-      const btn   = document.getElementById('invite-btn');
+      const email  = document.getElementById('invite-email').value.trim();
+      const btn    = document.getElementById('invite-btn');
       const result = document.getElementById('invite-result');
 
       result.style.display = 'none';
       result.className = 'result';
 
-      if (!email) {
-        showResult('error', 'Please enter an email address.');
-        return;
-      }
+      if (!email) { showInviteResult('error', 'Please enter an email address.'); return; }
 
       btn.disabled = true;
       btn.textContent = 'Generating...';
@@ -261,13 +394,9 @@
       try {
         const res = await fetch('/api/invite', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Key': adminKey,
-          },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
           body: JSON.stringify({ email }),
         });
-
         const data = await res.json();
 
         if (res.ok) {
@@ -276,18 +405,19 @@
           result.innerHTML = `Invite ready for <strong>${data.email}</strong>${reused}<div class="invite-url" onclick="copyUrl(this)" title="Click to copy">${data.invite_url}</div><div class="copy-hint">Click the link above to copy</div>`;
           result.style.display = 'block';
           document.getElementById('invite-email').value = '';
+          await loadAuditLog();
         } else {
-          showResult('error', data.error || 'Something went wrong.');
+          showInviteResult('error', data.error || 'Something went wrong.');
         }
-      } catch (err) {
-        showResult('error', 'Request failed. Check your connection.');
+      } catch {
+        showInviteResult('error', 'Request failed.');
       }
 
       btn.disabled = false;
       btn.textContent = 'Generate invite link';
     }
 
-    function showResult(type, msg) {
+    function showInviteResult(type, msg) {
       const result = document.getElementById('invite-result');
       result.className = `result ${type}`;
       result.textContent = msg;
@@ -295,8 +425,7 @@
     }
 
     function copyUrl(el) {
-      const url = el.textContent.trim();
-      navigator.clipboard.writeText(url).then(() => {
+      navigator.clipboard.writeText(el.textContent.trim()).then(() => {
         const toast = document.getElementById('copied-toast');
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 2000);
