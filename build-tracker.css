@@ -546,21 +546,7 @@
   html.light .ms-alert-row { background: rgba(216,60,62,0.08); }
 
 /* ── SHARING & COLLABORATION ── */
-.folder-share-btn {
-  opacity: 0; padding: 3px 5px; border: none; background: none;
-  cursor: pointer; color: var(--text-faint); border-radius: 4px;
-  transition: opacity 0.1s, background 0.1s; flex-shrink: 0; line-height: 1;
-}
-.folder-row:hover .folder-share-btn { opacity: 1; }
-.folder-share-btn:hover { background: var(--surface3); color: var(--accent-text); }
-
-.folder-activity-btn {
-  opacity: 0; padding: 3px 5px; border: none; background: none;
-  cursor: pointer; color: var(--text-faint); border-radius: 4px;
-  transition: opacity 0.1s, background 0.1s; flex-shrink: 0; line-height: 1;
-}
-.folder-row:hover .folder-activity-btn { opacity: 1; }
-.folder-activity-btn:hover { background: var(--surface3); color: var(--accent-text); }
+/* share + activity actions moved into ··· context menu */
 
 .folder-member-badge { font-size: 11px; flex-shrink: 0; opacity: 0.7; }
 

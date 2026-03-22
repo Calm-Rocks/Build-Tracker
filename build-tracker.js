@@ -160,9 +160,7 @@ function renderFolders() {
         ${c.role==='member'?`<span class="folder-member-badge" title="Shared with you">👥</span>`:''}
         <span class="folder-count">${n}</span>
       </button>
-      ${c.role==='owner'?`<button class="folder-share-btn" onclick="openShareModal(event,'${c.id}')" title="Share client"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 7l4-2M6 9l4 2"/></svg></button>`:''}
-      <button class="folder-activity-btn" onclick="openActivityPanel('${c.id}')" title="View activity"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8h2l2-4 2 8 2-4 2 2 2 0"/></svg></button>
-      <button class="folder-kebab" onclick="openCtx(event,'${c.id}')">···</button>
+      <button class="folder-kebab" onclick="openCtx(event,'${c.id}','${c.role||'owner'}')">···</button>
     </div>`;
   }).join('');
 }
@@ -539,15 +537,22 @@ function refreshSelects() {
 }
 
 /* ─── CONTEXT MENU ─── */
-function openCtx(e,cid) {
-  e.stopPropagation(); ctxId=cid;
-  const m=document.getElementById('ctx-menu');
-  m.style.left=e.clientX+'px'; m.style.top=e.clientY+'px';
+function openCtx(e, cid, role) {
+  e.stopPropagation(); ctxId = cid;
+  // Show/hide share option based on role
+  const shareItem    = document.getElementById('ctx-item-share');
+  const activityItem = document.getElementById('ctx-item-activity');
+  if (shareItem)    shareItem.style.display    = (role === 'owner') ? '' : 'none';
+  if (activityItem) activityItem.style.display = '';
+  const m = document.getElementById('ctx-menu');
+  m.style.left = e.clientX + 'px'; m.style.top = e.clientY + 'px';
   m.classList.add('open');
 }
 function closeCtx() { document.getElementById('ctx-menu').classList.remove('open'); ctxId=null; }
 async function ctxDo(action) {
   closeCtx(); if(!ctxId) return;
+  if (action==='share')    { openShareModal({ stopPropagation:()=>{} }, ctxId); return; }
+  if (action==='activity') { openActivityPanel(ctxId); return; }
   if (action==='edit'||action==='color') { openClientModal(ctxId); return; }
   if (action==='delete') {
     const c=clientOf(ctxId);

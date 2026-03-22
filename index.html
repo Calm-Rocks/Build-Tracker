@@ -273,6 +273,13 @@
 
 <!-- CONTEXT MENU -->
 <div class="ctx-menu" id="ctx-menu">
+  <button class="ctx-item" id="ctx-item-share" onclick="ctxDo('share')">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle;"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 7l4-2M6 9l4 2"/></svg>Share client
+  </button>
+  <button class="ctx-item" id="ctx-item-activity" onclick="ctxDo('activity')">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle;"><path d="M2 8h2l2-4 2 8 2-4 2 2 2 0"/></svg>View activity
+  </button>
+  <div style="height:1px;background:var(--border);margin:4px 0;"></div>
   <button class="ctx-item" onclick="ctxDo('edit')">Edit / rename</button>
   <button class="ctx-item" onclick="ctxDo('color')">Change colour</button>
   <button class="ctx-item danger" onclick="ctxDo('delete')">Delete folder</button>
