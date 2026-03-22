@@ -550,7 +550,10 @@ function openCtx(e, cid, role) {
 }
 function closeCtx() { document.getElementById('ctx-menu').classList.remove('open'); ctxId=null; }
 async function ctxDo(action) {
-  closeCtx(); if(!ctxId) return;
+  const id = ctxId;
+  closeCtx();
+  if (!id) return;
+  ctxId = id;  // restore briefly so downstream functions can read it
   if (action==='share')    { openShareModal(ctxId); return; }
   if (action==='activity') { openActivityPanel(ctxId); return; }
   if (action==='edit'||action==='color') { openClientModal(ctxId); return; }
