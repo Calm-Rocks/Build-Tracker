@@ -83,6 +83,8 @@ async function saveBuildToApi(build) {
   if (res.status === 404) {
     await apiFetch('/api/builds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
+
+  refreshActivityIfOpen(build.clientId);
 }
 
 async function saveClientToApi(client) {
@@ -100,11 +102,24 @@ async function saveClientToApi(client) {
   if (res.status === 404) {
     await apiFetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
+
+  refreshActivityIfOpen(client.id);
 }
 
 function save() {
   updateStats();
   renderFolders();
+}
+
+// After any local write, if the activity panel is open for the relevant
+// client, wait a short moment for the server to commit the log entry
+// then re-fetch so the panel updates immediately for the writing user too.
+function refreshActivityIfOpen(clientId) {
+  const workspaceId = clientId || '__personal__';
+  if (activityPanelOpen && activityClientId === workspaceId) {
+    // Small delay to let the server-side logActivity fire-and-forget complete
+    setTimeout(() => fetchActivity(workspaceId, false), 600);
+  }
 }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1425,10 +1440,23 @@ async function pollSync() {
         ];
       }
 
+<<<<<<< Updated upstream
       // Update activity cache
       if (workspace.activity && workspace.activity.length) {
         activityCache[workspace.clientId] = workspace.activity;
         needsActivityRefresh = true;
+=======
+      // Update activity cache — merge new entries at the top, keep older ones
+      if (workspace.activity && workspace.activity.length) {
+        const existing    = activityCache[workspace.clientId] || [];
+        const existingIds = new Set(existing.map(a => a.id));
+        const newEntries  = workspace.activity.filter(a => !existingIds.has(a.id));
+        if (newEntries.length) {
+          // Prepend new entries, keep existing (paginated) older ones
+          activityCache[workspace.clientId] = [...newEntries, ...existing];
+          needsActivityRefresh = true;
+        }
+>>>>>>> Stashed changes
       }
 
       needsRender = true;
