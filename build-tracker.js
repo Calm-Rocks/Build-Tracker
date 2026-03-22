@@ -551,7 +551,7 @@ function openCtx(e, cid, role) {
 function closeCtx() { document.getElementById('ctx-menu').classList.remove('open'); ctxId=null; }
 async function ctxDo(action) {
   closeCtx(); if(!ctxId) return;
-  if (action==='share')    { openShareModal({ stopPropagation:()=>{} }, ctxId); return; }
+  if (action==='share')    { openShareModal(ctxId); return; }
   if (action==='activity') { openActivityPanel(ctxId); return; }
   if (action==='edit'||action==='color') { openClientModal(ctxId); return; }
   if (action==='delete') {
@@ -1230,8 +1230,7 @@ async function _injectDemo() {
 let shareClientId  = null;
 let shareModalData = null; // { members, pendingInvites }
 
-function openShareModal(e, clientId) {
-  e.stopPropagation();
+function openShareModal(clientId) {
   shareClientId = clientId;
   const c = clients.find(x => x.id === clientId);
   document.getElementById('sm-client-name').textContent = c ? c.name : '';
