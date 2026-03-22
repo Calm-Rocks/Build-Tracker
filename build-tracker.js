@@ -2,8 +2,9 @@
    Build Tracker — Application Logic
    ============================================================ */
 
-let builds  = [];
-let clients = [];
+let builds        = [];
+let clients       = [];
+let currentUserId = null;
 
 async function loadData() {
   try {
@@ -15,8 +16,9 @@ async function loadData() {
     if (buildsRes.ok && clientsRes.ok) {
       const buildsData  = await buildsRes.json();
       const clientsData = await clientsRes.json();
-      builds  = buildsData.builds  || [];
-      clients = clientsData.clients || [];
+      builds        = buildsData.builds   || [];
+      clients       = clientsData.clients || [];
+      currentUserId = buildsData.userId   || null;
     } else if (buildsRes.status === 401 || clientsRes.status === 401) {
       window.location.href = '/auth/login';
     }
@@ -1220,6 +1222,8 @@ async function init() {
   updateStats();
   renderFolders();
   renderBoard();
+  await seedSyncVersions();
+  startSync();
 }
 
 init();
