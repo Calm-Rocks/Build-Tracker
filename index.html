@@ -7,8 +7,6 @@
 <link rel="stylesheet" href="build-tracker.css" />
 </head>
 <body>
-</head>
-<body>
 
 <aside>
   <div class="logo">
@@ -86,6 +84,7 @@
     <div class="topbar-left">
       <span class="page-title" id="page-title">All Builds</span>
       <input type="search" placeholder="Search..." id="search-input" oninput="renderBoard()" />
+      <span id="sync-indicator" style="font-size:11px;color:var(--text-faint);transition:opacity 0.5s;opacity:0;font-weight:600;white-space:nowrap;">Synced just now</span>
     </div>
     <div style="display:flex;gap:8px;">
       <button class="btn btn-sm" onclick="openImportModal()">
@@ -277,6 +276,53 @@
   <button class="ctx-item" onclick="ctxDo('edit')">Edit / rename</button>
   <button class="ctx-item" onclick="ctxDo('color')">Change colour</button>
   <button class="ctx-item danger" onclick="ctxDo('delete')">Delete folder</button>
+</div>
+
+
+<!-- SHARE CLIENT MODAL -->
+<div class="modal-overlay" id="share-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Share <span id="sm-client-name" style="color:var(--accent-text);"></span></h2>
+      <button class="modal-close" onclick="closeShareModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-section">
+        <h3>Members</h3>
+        <div id="sm-members-list"></div>
+      </div>
+      <div class="detail-section" style="margin-top:8px;">
+        <h3>Invite someone</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.6;">
+          Generate a single-use link. Anyone with a Build Tracker account can use it to join this client folder. Expires in 7 days.
+        </p>
+        <button class="btn btn-primary" id="sm-generate-btn" onclick="generateInviteLink()">Generate invite link</button>
+        <div id="sm-invite-wrap" style="display:none;margin-top:12px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);margin-bottom:6px;">Share this link</div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="sm-invite-url" readonly style="flex:1;font-size:12px;font-family:monospace;" />
+            <button class="btn btn-sm" onclick="copyInviteLink()">Copy</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">Single-use · expires in 7 days</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeShareModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACTIVITY PANEL -->
+<div id="activity-panel" class="activity-panel">
+  <div class="ap-header">
+    <div>
+      <div class="ap-title">Activity</div>
+      <div class="ap-subtitle" id="ap-client-name"></div>
+    </div>
+    <button class="modal-close" onclick="closeActivityPanel()">×</button>
+  </div>
+  <div class="ap-list" id="ap-list"></div>
 </div>
 
 <script src="build-tracker.js"></script>

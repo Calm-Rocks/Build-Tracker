@@ -2,8 +2,9 @@
    Build Tracker — Application Logic
    ============================================================ */
 
-let builds  = [];
-let clients = [];
+let builds        = [];
+let clients       = [];
+let currentUserId = null;
 
 async function loadData() {
   try {
@@ -15,8 +16,9 @@ async function loadData() {
     if (buildsRes.ok && clientsRes.ok) {
       const buildsData  = await buildsRes.json();
       const clientsData = await clientsRes.json();
-      builds  = buildsData.builds  || [];
-      clients = clientsData.clients || [];
+      builds        = buildsData.builds   || [];
+      clients       = clientsData.clients || [];
+      currentUserId = buildsData.userId   || null;
     } else if (buildsRes.status === 401 || clientsRes.status === 401) {
       window.location.href = '/auth/login';
     }
@@ -155,8 +157,11 @@ function renderFolders() {
       <button class="folder-btn${active?' active':''}" onclick="showClientView('${c.id}')">
         ${c.emoji?`<span class="folder-emoji">${c.emoji}</span>`:`<div class="folder-dot" style="background:${c.color}"></div>`}
         <span class="folder-name">${esc(c.name)}</span>
+        ${c.role==='member'?`<span class="folder-member-badge" title="Shared with you">👥</span>`:''}
         <span class="folder-count">${n}</span>
       </button>
+      ${c.role==='owner'?`<button class="folder-share-btn" onclick="openShareModal(event,'${c.id}')" title="Share client"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 7l4-2M6 9l4 2"/></svg></button>`:''}
+      <button class="folder-activity-btn" onclick="openActivityPanel('${c.id}')" title="View activity"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8h2l2-4 2 8 2-4 2 2 2 0"/></svg></button>
       <button class="folder-kebab" onclick="openCtx(event,'${c.id}')">···</button>
     </div>`;
   }).join('');
@@ -819,10 +824,10 @@ async function extractItems(){
   document.getElementById('ai-loading-wrap').style.display='';
   document.getElementById('btn-extract').style.display='none';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:'You are a project management assistant. Extract all action items, tasks, builds, tweaks, or follow-up items from the text. Return ONLY a JSON array, no markdown. Each item: {"title":"short 3-8 word title","desc":"one sentence","type":"build or tweak"}',messages:[{role:'user',content:`Extract:\n\n${text.slice(0,4000)}`}]})});
+    const res=await apiFetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
     const data=await res.json();
-    const raw=data.content?.map(i=>i.text||'').join('');
-    extractedItems=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    if(!res.ok) throw new Error(data.error||'Extraction failed');
+    extractedItems=data.items||[];
   }catch(err){
     extractedItems=text.split('\n').filter(l=>l.match(/^[-*•]\s+.{10,}|^\d+\.\s+.{10,}/)).slice(0,12).map(l=>({title:l.replace(/^[-*•\d.]\s+/,'').slice(0,60).trim(),desc:'',type:l.match(/fix|tweak|small|minor|update|adjust/i)?'tweak':'build'})).filter(i=>i.title.length>4);
     if(!extractedItems.length){alert('Could not extract items automatically. Try pasting cleaner text.');document.getElementById('ai-loading-wrap').style.display='none';document.getElementById('btn-extract').style.display='';return;}
@@ -1213,6 +1218,390 @@ async function _injectDemo() {
   toast('Demo data loaded — ' + builds.length + ' builds across ' + clients.length + ' clients');
 }
 
+/* ─── SHARING ─── */
+// ── SHARING MODAL ──
+// ============================================================
+
+let shareClientId  = null;
+let shareModalData = null; // { members, pendingInvites }
+
+function openShareModal(e, clientId) {
+  e.stopPropagation();
+  shareClientId = clientId;
+  const c = clients.find(x => x.id === clientId);
+  document.getElementById('sm-client-name').textContent = c ? c.name : '';
+  document.getElementById('share-modal').classList.add('open');
+  document.getElementById('sm-invite-url').value = '';
+  document.getElementById('sm-invite-wrap').style.display = 'none';
+  document.getElementById('sm-members-list').innerHTML =
+    '<div style="font-size:13px;color:var(--text-faint);padding:8px 0;">Loading…</div>';
+  loadShareData(clientId);
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').classList.remove('open');
+  shareClientId  = null;
+  shareModalData = null;
+}
+
+async function loadShareData(clientId) {
+  try {
+    const res  = await apiFetch(`/api/clients/${clientId}/share`);
+    const data = await res.json();
+    if (!res.ok) { renderShareError(data.error); return; }
+    shareModalData = data;
+    renderShareMembers(data);
+  } catch {
+    renderShareError('Failed to load sharing data.');
+  }
+}
+
+function renderShareError(msg) {
+  document.getElementById('sm-members-list').innerHTML =
+    `<div style="font-size:13px;color:var(--danger-text);">${msg}</div>`;
+}
+
+function renderShareMembers(data) {
+  const list = document.getElementById('sm-members-list');
+  if (!data.members.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-faint);">No members yet.</div>';
+    return;
+  }
+
+  list.innerHTML = data.members.map(m => `
+    <div class="share-member-row">
+      <div class="share-member-avatar">${(m.email[0] || '?').toUpperCase()}</div>
+      <div class="share-member-info">
+        <div class="share-member-email">${esc(m.email)}</div>
+        <div class="share-member-role">${m.role === 'owner' ? 'Owner' : 'Member'}</div>
+      </div>
+      ${m.role !== 'owner' ? `
+        <button class="btn btn-sm" style="color:var(--danger-text);padding:3px 8px;"
+          onclick="removeMember('${shareClientId}', ${m.userId}, '${esc(m.email)}')">Remove</button>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+async function generateInviteLink() {
+  const btn = document.getElementById('sm-generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  try {
+    const res  = await apiFetch(`/api/clients/${shareClientId}/share`, { method: 'POST' });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Failed to generate link.', true);
+      return;
+    }
+
+    document.getElementById('sm-invite-url').value = data.invite_url;
+    document.getElementById('sm-invite-wrap').style.display = '';
+  } catch {
+    toast('Network error.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate invite link';
+  }
+}
+
+function copyInviteLink() {
+  const inp = document.getElementById('sm-invite-url');
+  inp.select();
+  navigator.clipboard.writeText(inp.value).then(() => {
+    toast('Invite link copied to clipboard');
+  }).catch(() => {
+    document.execCommand('copy');
+    toast('Invite link copied');
+  });
+}
+
+async function removeMember(clientId, userId, email) {
+  if (!confirm(`Remove ${email} from this client?`)) return;
+
+  try {
+    const res = await apiFetch(`/api/clients/${clientId}/members/${userId}`, { method: 'DELETE' });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Failed to remove member.', true);
+      return;
+    }
+
+    toast(`${email} removed`);
+    loadShareData(clientId); // refresh member list
+  } catch {
+    toast('Network error.', true);
+  }
+}
+
+
+/* ─── SYNC & ACTIVITY ─── */
+const ACTION_LABELS = {
+  'build.created':         m => `created <strong>${esc(m.title)}</strong>`,
+  'build.updated':         m => `updated <strong>${esc(m.title)}</strong>`,
+  'build.status_changed':  m => `moved <strong>${esc(m.title)}</strong> → <em>${esc(m.newStatus)}</em>`,
+  'build.deleted':         m => `deleted build <strong>${esc(m.title)}</strong>`,
+  'milestone.completed':   m => `completed milestone <em>${esc(m.milestone)}</em> on <strong>${esc(m.title)}</strong>`,
+  'milestone.uncompleted': m => `reopened milestone <em>${esc(m.milestone)}</em> on <strong>${esc(m.title)}</strong>`,
+  'milestone.added':       m => `added milestone <em>${esc(m.milestone)}</em> to <strong>${esc(m.title)}</strong>`,
+  'milestone.removed':     m => `removed milestone <em>${esc(m.milestone)}</em> from <strong>${esc(m.title)}</strong>`,
+  'task.completed':        m => `completed task <em>${esc(m.task)}</em> on <strong>${esc(m.title)}</strong>`,
+  'task.uncompleted':      m => `reopened task <em>${esc(m.task)}</em> on <strong>${esc(m.title)}</strong>`,
+  'task.added':            m => `added task <em>${esc(m.task)}</em> to <strong>${esc(m.title)}</strong>`,
+  'client.created':        m => `created client <strong>${esc(m.name)}</strong>`,
+  'client.updated':        m => `updated client <strong>${esc(m.name)}</strong>`,
+  'member.joined':         m => `joined <strong>${esc(m.clientName)}</strong>`,
+  'member.removed':        m => `removed <strong>${esc(m.email)}</strong>`,
+};
+
+function renderActivityLabel(action, meta) {
+  const fn = ACTION_LABELS[action];
+  return fn ? fn(meta) : action;
+}
+
+// ── SYNC STATE ────────────────────────────────────────────────
+// clientId -> version number (last known)
+const syncVersions = {};
+let syncTimer      = null;
+const SYNC_INTERVAL_MS = 15000; // poll every 15 seconds
+
+function startSync() {
+  if (syncTimer) return;
+  syncTimer = setInterval(pollSync, SYNC_INTERVAL_MS);
+}
+
+function stopSync() {
+  clearInterval(syncTimer);
+  syncTimer = null;
+}
+
+function getSyncableClientIds() {
+  // Include all client IDs we know about, plus __personal__ for unshared builds
+  return ['__personal__', ...clients.map(c => c.id)];
+}
+
+async function pollSync() {
+  const ids = getSyncableClientIds();
+  if (!ids.length) return;
+
+  const versionsParam = ids.map(id => syncVersions[id] ?? 0).join(',');
+  const clientsParam  = ids.join(',');
+
+  try {
+    const res  = await apiFetch(`/api/sync?clients=${encodeURIComponent(clientsParam)}&versions=${encodeURIComponent(versionsParam)}`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (!data.changed || data.changed.length === 0) return;
+
+    let needsRender = false;
+    let needsActivityRefresh = false;
+
+    for (const workspace of data.changed) {
+      // Update version
+      syncVersions[workspace.clientId] = workspace.version;
+
+      // Merge builds — replace any builds belonging to this workspace
+      if (workspace.clientId === '__personal__') {
+        // Remove existing personal builds, add new ones
+        builds = [
+          ...builds.filter(b => b.clientId && b.clientId !== ''),
+          ...workspace.builds,
+        ];
+      } else {
+        builds = [
+          ...builds.filter(b => b.clientId !== workspace.clientId),
+          ...workspace.builds,
+        ];
+      }
+
+      // Update activity cache
+      if (workspace.activity && workspace.activity.length) {
+        activityCache[workspace.clientId] = workspace.activity;
+        needsActivityRefresh = true;
+      }
+
+      needsRender = true;
+    }
+
+    if (needsRender) {
+      updateStats();
+      renderFolders();
+
+      // Re-render the current view if relevant
+      if (currentView === 'daily') {
+        renderDaily();
+      } else if (currentView !== 'daily' && !currentBuildId) {
+        renderBoard();
+      }
+
+      // Show a subtle toast indicating data was refreshed
+      showSyncIndicator(data.changed.length);
+    }
+
+    if (needsActivityRefresh && activityPanelOpen) {
+      renderActivityFeed();
+    }
+
+  } catch (err) {
+    console.warn('Sync poll failed:', err);
+  }
+}
+
+function showSyncIndicator(changedCount) {
+  // Show a small non-intrusive indicator, not a full toast
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.textContent = 'Synced just now';
+  el.style.opacity = '1';
+  clearTimeout(el._fadeTimer);
+  el._fadeTimer = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+}
+
+// Seed initial versions after first loadData()
+// Call this at the end of init() in build-tracker.js:
+//   seedSyncVersions();
+//   startSync();
+async function seedSyncVersions() {
+  const ids = getSyncableClientIds();
+  if (!ids.length) return;
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    // We can't query D1 directly from frontend — instead, do a sync poll
+    // with version 0 for everything to get the current versions without
+    // triggering false "changed" deltas.
+    const res  = await apiFetch(`/api/sync?clients=${encodeURIComponent(ids.join(','))}&versions=${ids.map(() => '999999999').join(',')}`);
+    // version 999999999 = "I'm already up to date" so we get no changed data,
+    // but this lets us... actually we need a different approach.
+    // Instead, just fetch versions directly:
+    const vRes = await apiFetch(`/api/sync/versions?clients=${encodeURIComponent(ids.join(','))}`);
+    if (vRes.ok) {
+      const vData = await vRes.json();
+      for (const [cid, ver] of Object.entries(vData.versions || {})) {
+        syncVersions[cid] = ver;
+      }
+    }
+  } catch {
+    // Non-fatal — sync will work correctly on next poll
+  }
+}
+
+// ── SYNC VERSIONS ENDPOINT HELPER ─────────────────────────────
+// Add this simple endpoint to functions/api/sync/versions.js
+// (see sync-versions.js file)
+
+
+// ── ACTIVITY FEED ─────────────────────────────────────────────
+const activityCache = {};   // clientId -> activity[]
+let activityPanelOpen    = false;
+let activityClientId     = null;
+let activityLoading      = false;
+
+function openActivityPanel(clientId) {
+  activityClientId  = clientId;
+  activityPanelOpen = true;
+  document.getElementById('activity-panel').classList.add('open');
+  const c = clients.find(x => x.id === clientId);
+  document.getElementById('ap-client-name').textContent = c ? c.name : 'Activity';
+  document.getElementById('ap-list').innerHTML =
+    '<div class="ap-loading"><span class="spinner"></span> Loading…</div>';
+  fetchActivity(clientId, false);
+}
+
+function closeActivityPanel() {
+  activityPanelOpen = false;
+  activityClientId  = null;
+  document.getElementById('activity-panel').classList.remove('open');
+}
+
+async function fetchActivity(clientId, append) {
+  if (activityLoading) return;
+  activityLoading = true;
+
+  const cached = activityCache[clientId];
+  const before = append && cached && cached.length ? cached[cached.length - 1].id : null;
+
+  try {
+    const url = `/api/activity?clientId=${encodeURIComponent(clientId)}&limit=30${before ? '&before=' + before : ''}`;
+    const res  = await apiFetch(url);
+    if (!res.ok) { renderActivityError(); return; }
+
+    const data = await res.json();
+    const entries = data.activity || [];
+
+    if (append) {
+      activityCache[clientId] = [...(activityCache[clientId] || []), ...entries];
+    } else {
+      activityCache[clientId] = entries;
+    }
+
+    renderActivityFeed(data.hasMore);
+  } catch {
+    renderActivityError();
+  } finally {
+    activityLoading = false;
+  }
+}
+
+function renderActivityFeed(hasMore) {
+  const list    = document.getElementById('ap-list');
+  const entries = activityCache[activityClientId] || [];
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="ap-empty">No activity yet.</div>';
+    return;
+  }
+
+  // Group by day
+  const groups = {};
+  entries.forEach(a => {
+    const d   = new Date(a.createdAt);
+    const key = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(a);
+  });
+
+  list.innerHTML = Object.entries(groups).map(([day, items]) => `
+    <div class="ap-day-group">
+      <div class="ap-day-label">${day}</div>
+      ${items.map(a => {
+        const label   = renderActivityLabel(a.action, a.meta);
+        const time    = new Date(a.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const initial = (a.email || '?')[0].toUpperCase();
+        const isSelf  = a.userId === currentUserId;
+        return `<div class="ap-entry${isSelf ? ' ap-self' : ''}">
+          <div class="ap-avatar">${initial}</div>
+          <div class="ap-body">
+            <span class="ap-actor">${isSelf ? 'You' : esc(a.email.split('@')[0])}</span>
+            <span class="ap-action"> ${label}</span>
+          </div>
+          <div class="ap-time">${time}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+
+  // Load more button
+  if (hasMore) {
+    list.insertAdjacentHTML('beforeend', `
+      <button class="btn btn-sm" style="width:100%;margin-top:10px;"
+        onclick="fetchActivity('${activityClientId}', true)">Load more</button>
+    `);
+  }
+}
+
+function renderActivityError() {
+  document.getElementById('ap-list').innerHTML =
+    '<div class="ap-empty" style="color:var(--danger-text);">Failed to load activity.</div>';
+}
+
+// Expose current user ID so the feed can label "You" vs others
+// currentUserId is declared at the top of this file and seeded in loadData()
+
+
 /* ─── INIT ─── */
 async function init() {
   await loadData();
@@ -1220,6 +1609,8 @@ async function init() {
   updateStats();
   renderFolders();
   renderBoard();
+  await seedSyncVersions();
+  startSync();
 }
 
 init();
