@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="build-tracker.css" />
 </head>
 <body>
+</head>
+<body>
 
 <aside>
   <div class="logo">
@@ -273,18 +275,12 @@
 
 <!-- CONTEXT MENU -->
 <div class="ctx-menu" id="ctx-menu">
-  <button class="ctx-item" id="ctx-item-share" onclick="ctxDo('share')">
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle;"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 7l4-2M6 9l4 2"/></svg>Share client
-  </button>
-  <button class="ctx-item" id="ctx-item-activity" onclick="ctxDo('activity')">
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle;"><path d="M2 8h2l2-4 2 8 2-4 2 2 2 0"/></svg>View activity
-  </button>
-  <div style="height:1px;background:var(--border);margin:4px 0;"></div>
   <button class="ctx-item" onclick="ctxDo('edit')">Edit / rename</button>
   <button class="ctx-item" onclick="ctxDo('color')">Change colour</button>
   <button class="ctx-item danger" onclick="ctxDo('delete')">Delete folder</button>
 </div>
 
+<script src="build-tracker.js"></script>
 
 <!-- SHARE CLIENT MODAL -->
 <div class="modal-overlay" id="share-modal">
@@ -301,16 +297,24 @@
       <div class="detail-section" style="margin-top:8px;">
         <h3>Invite someone</h3>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.6;">
-          Generate a single-use link. Anyone with a Build Tracker account can use it to join this client folder. Expires in 7 days.
+          Generate a single-use invite link. Anyone with the link who has a Build Tracker account
+          can join this client folder. The link expires in 7 days.
         </p>
-        <button class="btn btn-primary" id="sm-generate-btn" onclick="generateInviteLink()">Generate invite link</button>
+        <button class="btn btn-primary" id="sm-generate-btn" onclick="generateInviteLink()">
+          Generate invite link
+        </button>
         <div id="sm-invite-wrap" style="display:none;margin-top:12px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);margin-bottom:6px;">Share this link</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);margin-bottom:6px;">
+            Share this link
+          </div>
           <div style="display:flex;gap:8px;">
-            <input type="text" id="sm-invite-url" readonly style="flex:1;font-size:12px;font-family:monospace;" />
+            <input type="text" id="sm-invite-url" readonly
+              style="flex:1;font-size:12px;font-family:monospace;background:var(--surface2);" />
             <button class="btn btn-sm" onclick="copyInviteLink()">Copy</button>
           </div>
-          <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">Single-use · expires in 7 days</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">
+            This link is single-use and expires in 7 days.
+          </p>
         </div>
       </div>
     </div>
@@ -320,7 +324,7 @@
   </div>
 </div>
 
-<!-- ACTIVITY PANEL -->
+<!-- ACTIVITY FEED PANEL -->
 <div id="activity-panel" class="activity-panel">
   <div class="ap-header">
     <div>
@@ -332,6 +336,5 @@
   <div class="ap-list" id="ap-list"></div>
 </div>
 
-<script src="build-tracker.js"></script>
 </body>
 </html>

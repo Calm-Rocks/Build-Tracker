@@ -2,9 +2,8 @@
    Build Tracker — Application Logic
    ============================================================ */
 
-let builds        = [];
-let clients       = [];
-let currentUserId = null;
+let builds  = [];
+let clients = [];
 
 async function loadData() {
   try {
@@ -16,9 +15,8 @@ async function loadData() {
     if (buildsRes.ok && clientsRes.ok) {
       const buildsData  = await buildsRes.json();
       const clientsData = await clientsRes.json();
-      builds        = buildsData.builds   || [];
-      clients       = clientsData.clients || [];
-      currentUserId = buildsData.userId   || null;
+      builds  = buildsData.builds  || [];
+      clients = clientsData.clients || [];
     } else if (buildsRes.status === 401 || clientsRes.status === 401) {
       window.location.href = '/auth/login';
     }
@@ -83,8 +81,6 @@ async function saveBuildToApi(build) {
   if (res.status === 404) {
     await apiFetch('/api/builds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
-
-  refreshActivityIfOpen(build.clientId);
 }
 
 async function saveClientToApi(client) {
@@ -102,24 +98,11 @@ async function saveClientToApi(client) {
   if (res.status === 404) {
     await apiFetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
-
-  refreshActivityIfOpen(client.id);
 }
 
 function save() {
   updateStats();
   renderFolders();
-}
-
-// After any local write, if the activity panel is open for the relevant
-// client, wait a short moment for the server to commit the log entry
-// then re-fetch so the panel updates immediately for the writing user too.
-function refreshActivityIfOpen(clientId) {
-  const workspaceId = clientId || '__personal__';
-  if (activityPanelOpen && activityClientId === workspaceId) {
-    // Small delay to let the server-side logActivity fire-and-forget complete
-    setTimeout(() => fetchActivity(workspaceId, false), 600);
-  }
 }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -172,10 +155,23 @@ function renderFolders() {
       <button class="folder-btn${active?' active':''}" onclick="showClientView('${c.id}')">
         ${c.emoji?`<span class="folder-emoji">${c.emoji}</span>`:`<div class="folder-dot" style="background:${c.color}"></div>`}
         <span class="folder-name">${esc(c.name)}</span>
-        ${c.role==='member'?`<span class="folder-member-badge" title="Shared with you">👥</span>`:''}
+        ${c.role === 'member' ? `<span class="folder-member-badge" title="Shared with you">👥</span>` : ''}
         <span class="folder-count">${n}</span>
       </button>
-      <button class="folder-kebab" onclick="openCtx(event,'${c.id}','${c.role||'owner'}')">···</button>
+      ${c.role === 'owner'
+        ? `<button class="folder-share-btn" onclick="openShareModal(event,'${c.id}')" title="Share client">
+             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+               <circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/>
+               <path d="M6 7l4-2M6 9l4 2"/>
+             </svg>
+           </button>`
+        : ''}
+      <button class="folder-activity-btn" onclick="openActivityPanel('${c.id}')" title="View activity">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 8h2l2-4 2 8 2-4 2 2 2 0"/>
+        </svg>
+      </button>
+      <button class="folder-kebab" onclick="openCtx(event,'${c.id}')">···</button>
     </div>`;
   }).join('');
 }
@@ -552,25 +548,15 @@ function refreshSelects() {
 }
 
 /* ─── CONTEXT MENU ─── */
-function openCtx(e, cid, role) {
-  e.stopPropagation(); ctxId = cid;
-  // Show/hide share option based on role
-  const shareItem    = document.getElementById('ctx-item-share');
-  const activityItem = document.getElementById('ctx-item-activity');
-  if (shareItem)    shareItem.style.display    = (role === 'owner') ? '' : 'none';
-  if (activityItem) activityItem.style.display = '';
-  const m = document.getElementById('ctx-menu');
-  m.style.left = e.clientX + 'px'; m.style.top = e.clientY + 'px';
+function openCtx(e,cid) {
+  e.stopPropagation(); ctxId=cid;
+  const m=document.getElementById('ctx-menu');
+  m.style.left=e.clientX+'px'; m.style.top=e.clientY+'px';
   m.classList.add('open');
 }
 function closeCtx() { document.getElementById('ctx-menu').classList.remove('open'); ctxId=null; }
 async function ctxDo(action) {
-  const id = ctxId;
-  closeCtx();
-  if (!id) return;
-  ctxId = id;  // restore briefly so downstream functions can read it
-  if (action==='share')    { openShareModal(ctxId); return; }
-  if (action==='activity') { openActivityPanel(ctxId); return; }
+  closeCtx(); if(!ctxId) return;
   if (action==='edit'||action==='color') { openClientModal(ctxId); return; }
   if (action==='delete') {
     const c=clientOf(ctxId);
@@ -847,10 +833,10 @@ async function extractItems(){
   document.getElementById('ai-loading-wrap').style.display='';
   document.getElementById('btn-extract').style.display='none';
   try{
-    const res=await apiFetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:'You are a project management assistant. Extract all action items, tasks, builds, tweaks, or follow-up items from the text. Return ONLY a JSON array, no markdown. Each item: {"title":"short 3-8 word title","desc":"one sentence","type":"build or tweak"}',messages:[{role:'user',content:`Extract:\n\n${text.slice(0,4000)}`}]})});
     const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'Extraction failed');
-    extractedItems=data.items||[];
+    const raw=data.content?.map(i=>i.text||'').join('');
+    extractedItems=JSON.parse(raw.replace(/```json|```/g,'').trim());
   }catch(err){
     extractedItems=text.split('\n').filter(l=>l.match(/^[-*•]\s+.{10,}|^\d+\.\s+.{10,}/)).slice(0,12).map(l=>({title:l.replace(/^[-*•\d.]\s+/,'').slice(0,60).trim(),desc:'',type:l.match(/fix|tweak|small|minor|update|adjust/i)?'tweak':'build'})).filter(i=>i.title.length>4);
     if(!extractedItems.length){alert('Could not extract items automatically. Try pasting cleaner text.');document.getElementById('ai-loading-wrap').style.display='none';document.getElementById('btn-extract').style.display='';return;}
@@ -1242,13 +1228,49 @@ async function _injectDemo() {
 }
 
 /* ─── SHARING ─── */
-// ── SHARING MODAL ──
+// ============================================================
+// SHARED CLIENT FRONTEND PATCH
+// Add these functions to build-tracker.js, and wire them in
+// as described in the comments below.
+// ============================================================
+
+// ── CHANGE 1: Update loadData() in build-tracker.js ──
+// The clients response now includes `role` and `ownerId` per client.
+// The builds response now includes `createdBy` per build.
+// No code change needed — these fields come through automatically.
+
+// ── CHANGE 2: Update renderFolders() ──
+// Replace the folder-btn inner HTML to show a share icon for owned clients.
+// Find this section and update the folder-btn template:
+//
+//   ${c.role === 'owner'
+//     ? `<button class="folder-share-btn" onclick="openShareModal(event,'${c.id}')" title="Share client">
+//          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+//            <circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/>
+//            <path d="M6 7l4-2M6 9l4 2"/>
+//          </svg>
+//        </button>`
+//     : `<span class="folder-member-badge" title="Shared with you">👥</span>`
+//   }
+
+// ── CHANGE 3: In saveClient() ──
+// After saving, the response now includes `role: 'owner'` in the refreshed client list.
+// No code change needed.
+
+// ── CHANGE 4: In clientOf() / renderBoard() ──
+// Builds from shared clients have `createdBy !== currentUserId`.
+// The card can optionally show a small "by other@email.com" label.
+// (Optional UI enhancement — not required for core functionality.)
+
+// ============================================================
+// SHARING MODAL STATE
 // ============================================================
 
 let shareClientId  = null;
 let shareModalData = null; // { members, pendingInvites }
 
-function openShareModal(clientId) {
+function openShareModal(e, clientId) {
+  e.stopPropagation();
   shareClientId = clientId;
   const c = clients.find(x => x.id === clientId);
   document.getElementById('sm-client-name').textContent = c ? c.name : '';
@@ -1361,6 +1383,13 @@ async function removeMember(clientId, userId, email) {
 
 
 /* ─── SYNC & ACTIVITY ─── */
+// ============================================================
+// build-tracker-sync.js
+// Real-time sync polling + activity feed
+// Append this to build-tracker.js (before the init() call)
+// ============================================================
+
+// ── ACTION LABEL RENDERERS (mirrors _activity.js) ────────────
 const ACTION_LABELS = {
   'build.created':         m => `created <strong>${esc(m.title)}</strong>`,
   'build.updated':         m => `updated <strong>${esc(m.title)}</strong>`,
@@ -1440,23 +1469,10 @@ async function pollSync() {
         ];
       }
 
-<<<<<<< Updated upstream
       // Update activity cache
       if (workspace.activity && workspace.activity.length) {
         activityCache[workspace.clientId] = workspace.activity;
         needsActivityRefresh = true;
-=======
-      // Update activity cache — merge new entries at the top, keep older ones
-      if (workspace.activity && workspace.activity.length) {
-        const existing    = activityCache[workspace.clientId] || [];
-        const existingIds = new Set(existing.map(a => a.id));
-        const newEntries  = workspace.activity.filter(a => !existingIds.has(a.id));
-        if (newEntries.length) {
-          // Prepend new entries, keep existing (paginated) older ones
-          activityCache[workspace.clientId] = [...newEntries, ...existing];
-          needsActivityRefresh = true;
-        }
->>>>>>> Stashed changes
       }
 
       needsRender = true;
@@ -1633,8 +1649,7 @@ function renderActivityError() {
     '<div class="ap-empty" style="color:var(--danger-text);">Failed to load activity.</div>';
 }
 
-// Expose current user ID so the feed can label "You" vs others
-// currentUserId is declared at the top of this file and seeded in loadData()
+// currentUserId is declared at the top of build-tracker.js
 
 
 /* ─── INIT ─── */
