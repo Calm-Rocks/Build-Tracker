@@ -1,0 +1,122 @@
+<!-- ============================================================
+     SHARING MODAL — add to index.html before </body>
+     ============================================================ -->
+
+<!-- SHARE CLIENT MODAL -->
+<div class="modal-overlay" id="share-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Share <span id="sm-client-name" style="color:var(--accent-text);"></span></h2>
+      <button class="modal-close" onclick="closeShareModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="detail-section">
+        <h3>Members</h3>
+        <div id="sm-members-list"></div>
+      </div>
+
+      <div class="detail-section" style="margin-top:8px;">
+        <h3>Invite someone</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.6;">
+          Generate a single-use invite link. Anyone with the link who has a Build Tracker account
+          can join this client folder. The link expires in 7 days.
+        </p>
+        <button class="btn btn-primary" id="sm-generate-btn" onclick="generateInviteLink()">
+          Generate invite link
+        </button>
+
+        <div id="sm-invite-wrap" style="display:none;margin-top:12px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);margin-bottom:6px;">
+            Share this link
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="sm-invite-url" readonly
+              style="flex:1;font-size:12px;font-family:monospace;background:var(--surface2);" />
+            <button class="btn btn-sm" onclick="copyInviteLink()">Copy</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-faint);margin-top:6px;">
+            This link is single-use and expires in 7 days.
+          </p>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeShareModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     CSS — add to build-tracker.css
+     ============================================================ -->
+<style>
+  /* Share button on folder rows */
+  .folder-share-btn {
+    opacity: 0; padding: 3px 5px; border: none; background: none;
+    cursor: pointer; color: var(--text-faint); border-radius: 4px;
+    transition: opacity 0.1s, background 0.1s; flex-shrink: 0;
+  }
+  .folder-row:hover .folder-share-btn { opacity: 1; }
+  .folder-share-btn:hover { background: var(--surface3); color: var(--accent-text); }
+
+  /* Shared-with-you badge */
+  .folder-member-badge {
+    font-size: 11px; flex-shrink: 0; opacity: 0.6;
+  }
+
+  /* Member list in share modal */
+  .share-member-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .share-member-row:last-child { border-bottom: none; }
+
+  .share-member-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent-bg); color: var(--accent-text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+
+  .share-member-info { flex: 1; min-width: 0; }
+  .share-member-email { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .share-member-role { font-size: 11px; color: var(--text-faint); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+</style>
+
+
+<!-- ============================================================
+     renderFolders() UPDATE — replace the folder-btn return in build-tracker.js
+     Find:
+       return `<div class="folder-row">
+         <button class="folder-btn${active?' active':''}" onclick="showClientView('${c.id}')">
+           ${c.emoji?...dot}
+           <span class="folder-name">${esc(c.name)}</span>
+           <span class="folder-count">${n}</span>
+         </button>
+         <button class="folder-kebab" onclick="openCtx(event,'${c.id}')">···</button>
+       </div>`;
+
+     Replace with:
+     ============================================================ -->
+<!--
+  return `<div class="folder-row">
+    <button class="folder-btn${active?' active':''}" onclick="showClientView('${c.id}')">
+      ${c.emoji?`<span class="folder-emoji">${c.emoji}</span>`:`<div class="folder-dot" style="background:${c.color}"></div>`}
+      <span class="folder-name">${esc(c.name)}</span>
+      ${c.role === 'member' ? `<span class="folder-member-badge" title="Shared with you">👥</span>` : ''}
+      <span class="folder-count">${n}</span>
+    </button>
+    ${c.role === 'owner'
+      ? `<button class="folder-share-btn" onclick="openShareModal(event,'${c.id}')" title="Share client">
+           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+             <circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/>
+             <path d="M6 7l4-2M6 9l4 2"/>
+           </svg>
+         </button>`
+      : ''}
+    <button class="folder-kebab" onclick="openCtx(event,'${c.id}')">···</button>
+  </div>`;
+-->

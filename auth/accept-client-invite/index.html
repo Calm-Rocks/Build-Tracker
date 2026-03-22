@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build Tracker — Join Client</title>
+  <style>
+    :root {
+      --bg: #313338; --surface: #383A40; --surface2: #2E3035;
+      --border-strong: rgba(255,255,255,0.12); --text: #F2F3F5;
+      --text-muted: #B5BAC1; --text-faint: #80848E;
+      --accent: #5865F2; --success: #57F287;
+      --danger-text: #F28082; --radius: 6px; --radius-lg: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'gg sans', 'Noto Sans', Whitney, 'Helvetica Neue', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); padding: 32px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; display: block; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .sub { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; }
+    .client-name {
+      display: inline-block; background: rgba(88,101,242,0.15);
+      color: #8892F2; padding: 4px 14px; border-radius: 20px;
+      font-weight: 700; font-size: 15px; margin-bottom: 24px;
+    }
+    .btn {
+      width: 100%; padding: 11px; border-radius: var(--radius);
+      background: var(--accent); color: white; border: none;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+    }
+    .btn:hover { background: #4752C4; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { color: var(--danger-text); font-size: 13px; margin-top: 14px; }
+    .success { color: var(--success); font-size: 13px; margin-top: 14px; }
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="card" id="card">
+  <span class="icon">🔗</span>
+  <h1>You've been invited</h1>
+  <p class="sub">You've been invited to collaborate on a client folder in Build Tracker.</p>
+  <div id="state-loading"><span class="spinner"></span> Validating invite...</div>
+</div>
+
+<script>
+  const params  = new URLSearchParams(location.search);
+  const token   = params.get('token');
+
+  async function init() {
+    if (!token) {
+      showError('No invite token found in this link.');
+      return;
+    }
+
+    // The middleware will redirect to /auth/login if not logged in,
+    // preserving the current URL as ?next= so the user lands back here after login.
+    try {
+      const res  = await fetch('/api/auth/accept-client-invite', {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrf(),
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'Something went wrong.');
+        return;
+      }
+
+      if (data.alreadyMember) {
+        showResult('✅', `You're already a member of <strong>${esc(data.clientName)}</strong>.`, data.clientId);
+      } else {
+        showResult('🎉', `You've joined <strong>${esc(data.clientName)}</strong>! You can now see and edit all builds in this client.`, data.clientId);
+      }
+
+    } catch (err) {
+      showError('Network error. Please try again.');
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('state-loading').innerHTML =
+      `<div class="error">${msg}</div>`;
+  }
+
+  function showResult(icon, msg, clientId) {
+    document.getElementById('card').innerHTML = `
+      <span class="icon">${icon}</span>
+      <h1>You're in!</h1>
+      <p class="sub">${msg}</p>
+      <button class="btn" onclick="window.location.href='/'">Open Build Tracker →</button>
+    `;
+  }
+
+  function getCsrf() {
+    const match = document.cookie.match(/(?:^|;\s*)bt_csrf=([^;]*)/);
+    return match ? match[1] : '';
+  }
+
+  function esc(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  init();
+</script>
+</body>
+</html>

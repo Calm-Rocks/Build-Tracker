@@ -1,0 +1,167 @@
+<!-- ============================================================
+     ACTIVITY PANEL — add to index.html before </body>
+     ============================================================ -->
+
+<!-- ACTIVITY FEED PANEL (slides in from the right) -->
+<div id="activity-panel" class="activity-panel">
+  <div class="ap-header">
+    <div>
+      <div class="ap-title">Activity</div>
+      <div class="ap-subtitle" id="ap-client-name"></div>
+    </div>
+    <button class="modal-close" onclick="closeActivityPanel()">×</button>
+  </div>
+  <div class="ap-list" id="ap-list"></div>
+</div>
+
+<!-- Sync status indicator — sits in the topbar -->
+<!-- Add this inside the .topbar-left div in index.html, after the search input: -->
+<span id="sync-indicator" style="
+  font-size:11px; color:var(--text-faint); transition:opacity 0.5s; opacity:0;
+  font-weight:600; white-space:nowrap;
+">Synced just now</span>
+
+
+<!-- ============================================================
+     CSS — append to build-tracker.css
+     ============================================================ -->
+<style>
+/* ── ACTIVITY PANEL ── */
+.activity-panel {
+  position: fixed; top: 0; right: -380px; width: 360px; height: 100vh;
+  background: var(--sidebar-bg); border-left: 1px solid var(--border-strong);
+  display: flex; flex-direction: column; z-index: 90;
+  transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.3);
+}
+.activity-panel.open { right: 0; }
+
+.ap-header {
+  padding: 16px 18px 12px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-shrink: 0;
+}
+.ap-title    { font-size: 15px; font-weight: 700; }
+.ap-subtitle { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+
+.ap-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+.ap-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-faint); padding: 16px 0; }
+.ap-empty   { font-size: 13px; color: var(--text-faint); padding: 16px 0; text-align: center; }
+
+.ap-day-group { margin-bottom: 20px; }
+.ap-day-label {
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-faint);
+  margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ap-entry {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.ap-entry:last-child { border-bottom: none; }
+.ap-entry.ap-self .ap-avatar { background: var(--accent-bg); color: var(--accent-text); }
+
+.ap-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface3); color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+
+.ap-body  { flex: 1; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+.ap-actor { font-weight: 700; color: var(--text); }
+.ap-time  { font-size: 11px; color: var(--text-faint); white-space: nowrap; margin-top: 3px; }
+
+/* ── ACTIVITY BUTTON on folder rows ── */
+.folder-activity-btn {
+  opacity: 0; padding: 3px 5px; border: none; background: none;
+  cursor: pointer; color: var(--text-faint); border-radius: 4px;
+  transition: opacity 0.1s, background 0.1s; flex-shrink: 0; font-size: 12px;
+}
+.folder-row:hover .folder-activity-btn { opacity: 1; }
+.folder-activity-btn:hover { background: var(--surface3); color: var(--accent-text); }
+</style>
+
+
+<!-- ============================================================
+     renderFolders() FULL REPLACEMENT
+     Replace the entire folder-btn return block in build-tracker.js
+     with the version below. (Adds share button + activity button)
+     ============================================================ -->
+<!--
+  el.innerHTML = clients.map(c => {
+    const n      = builds.filter(b => b.clientId === c.id).length;
+    const active = currentView === 'client' && currentClientId === c.id;
+    return `<div class="folder-row">
+      <button class="folder-btn${active ? ' active' : ''}" onclick="showClientView('${c.id}')">
+        ${c.emoji
+          ? `<span class="folder-emoji">${c.emoji}</span>`
+          : `<div class="folder-dot" style="background:${c.color}"></div>`
+        }
+        <span class="folder-name">${esc(c.name)}</span>
+        ${c.role === 'member' ? `<span class="folder-member-badge" title="Shared with you">👥</span>` : ''}
+        <span class="folder-count">${n}</span>
+      </button>
+      ${c.role === 'owner'
+        ? `<button class="folder-share-btn" onclick="openShareModal(event,'${c.id}')" title="Share client">
+             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+               <circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/>
+               <path d="M6 7l4-2M6 9l4 2"/>
+             </svg>
+           </button>`
+        : ''
+      }
+      <button class="folder-activity-btn" onclick="openActivityPanel('${c.id}')" title="View activity">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 8h2l2-4 2 8 2-4 2 2 2 0"/>
+        </svg>
+      </button>
+      <button class="folder-kebab" onclick="openCtx(event,'${c.id}')">···</button>
+    </div>`;
+  }).join('');
+-->
+
+
+<!-- ============================================================
+     init() CHANGES in build-tracker.js
+     Update the async init() function at the bottom of the file:
+     ============================================================ -->
+<!--
+async function init() {
+  const res = await loadData();   // <-- loadData should return the user object
+  if (res && res.userId) {
+    currentUserId = res.userId;
+  }
+  refreshSelects();
+  updateStats();
+  renderFolders();
+  renderBoard();
+  await seedSyncVersions();
+  startSync();
+}
+
+// And update loadData() to return the user ID:
+async function loadData() {
+  try {
+    const [buildsRes, clientsRes] = await Promise.all([
+      apiFetch('/api/builds'),
+      apiFetch('/api/clients'),
+    ]);
+    if (buildsRes.ok && clientsRes.ok) {
+      const buildsData  = await buildsRes.json();
+      const clientsData = await clientsRes.json();
+      builds  = buildsData.builds   || [];
+      clients = clientsData.clients || [];
+      return { userId: buildsData.userId };  // server needs to include this
+    } else if (buildsRes.status === 401 || clientsRes.status === 401) {
+      window.location.href = '/auth/login';
+    }
+  } catch (err) {
+    console.error('Failed to load data:', err);
+  }
+  return null;
+}
+-->

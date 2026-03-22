@@ -1,12 +1,18 @@
-export async function onRequestGet(context) {
-  const { env, data } = context;
-  const userId = data.user.id;
+// functions/api/builds.js
+// GET  — all builds the user can see (own + shared client memberships)
+// POST — create a new build, logs activity
 
-  const { results } = await env.DB.prepare(
-    'SELECT * FROM builds WHERE user_id = ? ORDER BY created_at DESC'
-  ).bind(userId).all();
+import { logActivity, A } from './_activity.js';
 
-  const builds = results.map(b => ({
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function mapBuild(b) {
+  return {
     id:            b.id,
     clientId:      b.client_id,
     parentBuildId: b.parent_build_id,
@@ -21,21 +27,34 @@ export async function onRequestGet(context) {
     milestones:    JSON.parse(b.milestones || '[]'),
     tweaks:        JSON.parse(b.tweaks     || '[]'),
     createdAt:     b.created_at,
-  }));
+    createdBy:     b.user_id,
+  };
+}
 
-  return json({ builds });
+export async function onRequestGet(context) {
+  const { env, data } = context;
+  const userId = data.user.id;
+
+  const { results } = await env.DB.prepare(`
+    SELECT DISTINCT b.*
+    FROM   builds b
+    LEFT   JOIN client_members cm ON cm.client_id = b.client_id AND cm.user_id = ?
+    WHERE  b.user_id = ?
+       OR  cm.user_id = ?
+    ORDER  BY b.created_at DESC
+  `).bind(userId, userId, userId).all();
+
+  return json({ builds: results.map(mapBuild), userId });  // userId so frontend can seed currentUserId
 }
 
 export async function onRequestPost(context) {
   const { request, env, data } = context;
-  const userId = data.user.id;
+  const userId    = data.user.id;
+  const userEmail = data.user.email;
 
   let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid request body.' }, 400);
-  }
+  try { body = await request.json(); }
+  catch { return json({ error: 'Invalid request body.' }, 400); }
 
   const {
     id, title, type, status, clientId, parentBuildId,
@@ -45,6 +64,13 @@ export async function onRequestPost(context) {
 
   if (!id || !title || !type || !status) {
     return json({ error: 'Missing required fields.' }, 400);
+  }
+
+  if (clientId) {
+    const membership = await env.DB.prepare(
+      'SELECT role FROM client_members WHERE client_id = ? AND user_id = ?'
+    ).bind(clientId, userId).first();
+    if (!membership) return json({ error: 'You are not a member of that client.' }, 403);
   }
 
   await env.DB.prepare(`
@@ -63,12 +89,14 @@ export async function onRequestPost(context) {
     createdAt || Date.now()
   ).run();
 
-  return json({ ok: true, id });
-}
+  logActivity(env, {
+    clientId:  clientId || '__personal__',
+    buildId:   id,
+    userId,
+    userEmail,
+    action:    A.BUILD_CREATED,
+    meta:      { title },
+  }).catch(err => console.error('Activity log error:', err));
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return json({ ok: true, id });
 }
