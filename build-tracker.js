@@ -821,10 +821,10 @@ async function extractItems(){
   document.getElementById('ai-loading-wrap').style.display='';
   document.getElementById('btn-extract').style.display='none';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:'You are a project management assistant. Extract all action items, tasks, builds, tweaks, or follow-up items from the text. Return ONLY a JSON array, no markdown. Each item: {"title":"short 3-8 word title","desc":"one sentence","type":"build or tweak"}',messages:[{role:'user',content:`Extract:\n\n${text.slice(0,4000)}`}]})});
+    const res=await apiFetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
     const data=await res.json();
-    const raw=data.content?.map(i=>i.text||'').join('');
-    extractedItems=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    if(!res.ok) throw new Error(data.error||'Extraction failed');
+    extractedItems=data.items||[];
   }catch(err){
     extractedItems=text.split('\n').filter(l=>l.match(/^[-*•]\s+.{10,}|^\d+\.\s+.{10,}/)).slice(0,12).map(l=>({title:l.replace(/^[-*•\d.]\s+/,'').slice(0,60).trim(),desc:'',type:l.match(/fix|tweak|small|minor|update|adjust/i)?'tweak':'build'})).filter(i=>i.title.length>4);
     if(!extractedItems.length){alert('Could not extract items automatically. Try pasting cleaner text.');document.getElementById('ai-loading-wrap').style.display='none';document.getElementById('btn-extract').style.display='';return;}
