@@ -52,7 +52,7 @@ export async function onRequestPost(context) {
   `).bind(token).first();
 
   if (!invite) {
-    await audit(env, 'client_invite_invalid_token', { user_id: userId, email, ip, meta: { token } });
+    await audit(env, 'client_invite_invalid_token', { user_id: userId, email, ip });
     return json({ error: 'Invalid or expired invite link.' }, 400);
   }
 

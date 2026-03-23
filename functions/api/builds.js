@@ -66,6 +66,10 @@ export async function onRequestPost(context) {
     return json({ error: 'Missing required fields.' }, 400);
   }
 
+  if (title.length > 200) return json({ error: 'Title too long (max 200 characters).' }, 400);
+  if (notes    && notes.length       > 10000) return json({ error: 'Notes too long (max 10000 characters).' }, 400);
+  if (description && description.length > 2000) return json({ error: 'Description too long (max 2000 characters).' }, 400);
+
   if (clientId) {
     const membership = await env.DB.prepare(
       'SELECT role FROM client_members WHERE client_id = ? AND user_id = ?'

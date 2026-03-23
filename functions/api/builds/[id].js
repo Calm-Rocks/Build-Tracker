@@ -70,6 +70,11 @@ export async function onRequestPut(context) {
     notes, milestones, tweaks,
   } = body;
 
+  if (!title) return json({ error: 'Title is required.' }, 400);
+  if (title.length > 200) return json({ error: 'Title too long (max 200 characters).' }, 400);
+  if (notes       && notes.length       > 10000) return json({ error: 'Notes too long (max 10000 characters).' }, 400);
+  if (description && description.length >  2000) return json({ error: 'Description too long (max 2000 characters).' }, 400);
+
   await env.DB.prepare(`
     UPDATE builds SET
       title = ?, type = ?, status = ?,

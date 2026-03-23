@@ -14,15 +14,30 @@ async function audit(env, event, data = {}) {
   ).run();
 }
 
+function parseCookie(cookieHeader, name) {
+  const match = (cookieHeader || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? match[1] : null;
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
+  const stateParam = url.searchParams.get('state');
 
   if (error || !code) {
     await audit(env, 'google_auth_denied', { ip });
+    return Response.redirect(`${url.origin}/auth/login?error=google_failed`, 302);
+  }
+
+  // Validate OAuth state to prevent CSRF
+  const cookie = request.headers.get('Cookie') || '';
+  const stateCookie = parseCookie(cookie, 'bt_oauth_state');
+
+  if (!stateParam || !stateCookie || stateParam !== stateCookie) {
+    await audit(env, 'google_state_mismatch', { ip });
     return Response.redirect(`${url.origin}/auth/login?error=google_failed`, 302);
   }
 
@@ -119,7 +134,7 @@ export async function onRequestGet(context) {
 
   await audit(env, 'login_success_google', { email: user.email, ip, user_id: user.id });
 
-  const cookie = [
+  const sessionCookie = [
     `${COOKIE_NAME}=${sessionId}`,
     'HttpOnly',
     'Secure',
@@ -128,11 +143,15 @@ export async function onRequestGet(context) {
     'Path=/',
   ].join('; ');
 
+  // Clear the OAuth state cookie
+  const clearStateCookie = 'bt_oauth_state=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/';
+
   return new Response(null, {
     status: 302,
-    headers: {
-      'Location': '/',
-      'Set-Cookie': cookie,
-    },
+    headers: new Headers([
+      ['Location', '/'],
+      ['Set-Cookie', sessionCookie],
+      ['Set-Cookie', clearStateCookie],
+    ]),
   });
 }

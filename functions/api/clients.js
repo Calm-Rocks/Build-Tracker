@@ -49,6 +49,11 @@ export async function onRequestPost(context) {
   const { id, name, color, emoji, notes, createdAt } = body;
   if (!id || !name || !color) return json({ error: 'Missing required fields.' }, 400);
 
+  if (name.length  > 100)  return json({ error: 'Name too long (max 100 characters).' }, 400);
+  if (color.length > 20)   return json({ error: 'Color value too long.' }, 400);
+  if (emoji && emoji.length > 10)   return json({ error: 'Emoji value too long.' }, 400);
+  if (notes && notes.length > 5000) return json({ error: 'Notes too long (max 5000 characters).' }, 400);
+
   const now = createdAt || Date.now();
 
   await env.DB.prepare(`

@@ -1,5 +1,43 @@
+const RATE_LIMIT_MAX    = 20;
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
+
+async function checkRateLimit(env, userId) {
+  const key = `extract:${userId}`;
+  const now = Date.now();
+  const record = await env.DB.prepare(
+    'SELECT attempts, window_start FROM rate_limits WHERE key = ?'
+  ).bind(key).first();
+
+  if (!record) {
+    await env.DB.prepare(
+      'INSERT INTO rate_limits (key, attempts, window_start) VALUES (?, 1, ?)'
+    ).bind(key, now).run();
+    return { limited: false };
+  }
+
+  if (now - record.window_start > RATE_LIMIT_WINDOW) {
+    await env.DB.prepare(
+      'UPDATE rate_limits SET attempts = 1, window_start = ? WHERE key = ?'
+    ).bind(now, key).run();
+    return { limited: false };
+  }
+
+  const attempts = record.attempts + 1;
+  await env.DB.prepare(
+    'UPDATE rate_limits SET attempts = ? WHERE key = ?'
+  ).bind(attempts, key).run();
+
+  return { limited: attempts > RATE_LIMIT_MAX };
+}
+
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { request, env, data } = context;
+  const userId = data.user.id;
+
+  const { limited } = await checkRateLimit(env, userId);
+  if (limited) {
+    return json({ error: 'Too many extraction requests. Please try again later.' }, 429);
+  }
 
   let body;
   try {
@@ -38,14 +76,14 @@ export async function onRequestPost(context) {
       }),
     });
 
-    const data = await res.json();
+    const apiData = await res.json();
 
     if (!res.ok) {
-      console.error('Anthropic API error:', data);
+      console.error('Anthropic API error:', apiData);
       return json({ error: 'AI extraction failed.' }, 502);
     }
 
-    const raw   = data.content?.map(i => i.text || '').join('');
+    const raw   = apiData.content?.map(i => i.text || '').join('');
     const items = JSON.parse(raw.replace(/```json|```/g, '').trim());
 
     return json({ ok: true, items });

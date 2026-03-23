@@ -33,6 +33,12 @@ export async function onRequestPut(context) {
 
   const { name, color, emoji, notes } = body;
 
+  if (!name) return json({ error: 'Name is required.' }, 400);
+  if (name.length  > 100)  return json({ error: 'Name too long (max 100 characters).' }, 400);
+  if (color && color.length > 20)   return json({ error: 'Color value too long.' }, 400);
+  if (emoji && emoji.length > 10)   return json({ error: 'Emoji value too long.' }, 400);
+  if (notes && notes.length > 5000) return json({ error: 'Notes too long (max 5000 characters).' }, 400);
+
   await env.DB.prepare(`
     UPDATE clients SET name = ?, color = ?, emoji = ?, notes = ?
     WHERE id = ?
@@ -59,6 +65,7 @@ export async function onRequestDelete(context) {
   if (membership.role !== 'owner') return json({ error: 'Only the owner can delete this client.' }, 403);
 
   await Promise.all([
+    env.DB.prepare('DELETE FROM builds WHERE client_id = ?').bind(clientId).run(),
     env.DB.prepare('DELETE FROM client_members WHERE client_id = ?').bind(clientId).run(),
     env.DB.prepare('DELETE FROM client_share_invites WHERE client_id = ?').bind(clientId).run(),
     env.DB.prepare('DELETE FROM activity_log WHERE client_id = ?').bind(clientId).run(),
